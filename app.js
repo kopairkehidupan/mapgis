@@ -1,235 +1,206 @@
-// --- Inisialisasi peta ---
+// Inisialisasi peta
 var map = L.map('map').setView([0.5, 101.4], 12);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 22,
 }).addTo(map);
 
-// grup layer yang bisa diedit (Leaflet.draw)
 var editableLayers = new L.FeatureGroup().addTo(map);
 
-// control draw
+// Draw control
 var drawControl = new L.Control.Draw({
     edit: { featureGroup: editableLayers },
-    draw: {
-        polygon: true,
-        polyline: true,
-        rectangle: true,
-        circle: false,
-        marker: true
-    }
+    draw: { polygon:true, polyline:true, rectangle:true, marker:true, circle:false }
 });
 map.addControl(drawControl);
 
-map.on(L.Draw.Event.CREATED, function (e) {
+map.on(L.Draw.Event.CREATED, function(e){
     editableLayers.addLayer(e.layer);
 });
 
-// ===== Manajemen file & layer =====
-var uploadedFiles = {}; // id -> { name, group (LayerGroup), bounds }
+// ===== Penyimpanan layer =====
+var uploadedFiles = {};    
+// id -> { name, group:LayerGroup, bounds, color, weight }
 
-// helper: tambahkan semua sublayer GeoJSON ke sebuah layerGroup (per-file)
-function createFileGroupFromGeoJSON(geojson, options) {
-    options = options || {};
-    var tmp = L.geoJSON(geojson, options);
-    var group = L.layerGroup();
-    tmp.eachLayer(function (layer) {
-        // simpan layer ke group (tidak langsung ke editableLayers)
-        group.addLayer(layer);
+// Membuat LayerGroup per file
+function createGroupFromGeoJSON(geojson, color){
+    const group = L.layerGroup();
+    const base = L.geoJSON(geojson, {
+        style: { color:color, weight:3 },
+        pointToLayer: (f,latlng)=>L.circleMarker(latlng,{radius:5,color:color})
     });
-    return { tmpGeo: tmp, group: group };
+
+    base.eachLayer(l => group.addLayer(l));
+    return group;
 }
 
-// show/hide file by id (checkbox)
-function toggleFileDisplay(id, show) {
-    var meta = uploadedFiles[id];
-    if (!meta) return;
-    if (show) {
-        // tambahkan tiap layer dari group ke peta & ke editableLayers
-        meta.group.eachLayer(function (layer) {
-            map.addLayer(layer);
-            editableLayers.addLayer(layer);
-        });
-    } else {
-        // hapus tiap layer dari peta & editableLayers
-        meta.group.eachLayer(function (layer) {
-            if (map.hasLayer(layer)) map.removeLayer(layer);
-            if (editableLayers.hasLayer(layer)) editableLayers.removeLayer(layer);
-        });
-    }
-}
+// UI List
+function addFileEntry(id, name){
+    const ul = document.getElementById("fileList");
 
-// zoom ke file
-function zoomToFile(id) {
-    var meta = uploadedFiles[id];
-    if (!meta) return;
-    if (meta.bounds) {
-        map.fitBounds(meta.bounds);
-    }
-}
+    const li = document.createElement("li");
+    li.id = "file-" + id;
 
-// hapus file sepenuhnya (dari list & map)
-function removeFile(id) {
-    var meta = uploadedFiles[id];
-    if (!meta) return;
-    // pastikan semua layer dihapus dari map dan editable
-    meta.group.eachLayer(function (layer) {
-        if (map.hasLayer(layer)) map.removeLayer(layer);
-        if (editableLayers.hasLayer(layer)) editableLayers.removeLayer(layer);
-    });
-    // hapus dari daftar
-    delete uploadedFiles[id];
-    var el = document.getElementById('file-item-' + id);
-    if (el) el.remove();
-}
+    // Header
+    const header = document.createElement("div");
+    header.className = "file-header";
 
-// helper untuk menambahkan entry di UI list
-function addFileListEntry(id, name) {
-    var ul = document.getElementById('fileList');
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.checked = true;
+    chk.onchange = ()=> toggleFile(id, chk.checked);
 
-    var li = document.createElement('li');
-    li.id = 'file-item-' + id;
-
-    var checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.checked = true;
-    checkbox.id = 'chk-' + id;
-    checkbox.onchange = function () {
-        toggleFileDisplay(id, this.checked);
-    };
-
-    var label = document.createElement('label');
-    label.htmlFor = checkbox.id;
+    const label = document.createElement("label");
     label.innerText = name;
 
-    // zoom button
-    var zoomBtn = document.createElement('button');
-    zoomBtn.className = 'btn-small';
-    zoomBtn.title = 'Zoom to layer';
-    zoomBtn.innerText = 'Zoom';
-    zoomBtn.onclick = function (e) {
-        e.stopPropagation();
-        zoomToFile(id);
-    };
+    header.appendChild(chk);
+    header.appendChild(label);
+    li.appendChild(header);
 
-    // remove button
-    var rmBtn = document.createElement('button');
-    rmBtn.className = 'btn-small';
-    rmBtn.title = 'Hapus file';
-    rmBtn.innerText = 'Hapus';
-    rmBtn.onclick = function (e) {
-        e.stopPropagation();
-        if (!confirm('Hapus file "' + name + '"?')) return;
-        removeFile(id);
-    };
+    // Buttons row
+    const row = document.createElement("div");
+    row.className = "btn-row";
 
-    li.appendChild(checkbox);
-    li.appendChild(label);
-    li.appendChild(zoomBtn);
-    li.appendChild(rmBtn);
+    const btnZoom = document.createElement("button");
+    btnZoom.className = "btn-small";
+    btnZoom.innerText = "Zoom";
+    btnZoom.onclick = ()=> zoomFile(id);
 
+    const btnStyle = document.createElement("button");
+    btnStyle.className = "btn-small";
+    btnStyle.innerText = "Style";
+    btnStyle.onclick = ()=> editStyle(id);
+
+    const btnExport = document.createElement("button");
+    btnExport.className = "btn-small";
+    btnExport.innerText = "Export KML";
+    btnExport.onclick = ()=> exportKML(id);
+
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn-small";
+    btnDel.innerText = "Hapus";
+    btnDel.onclick = ()=> deleteFile(id);
+
+    row.appendChild(btnZoom);
+    row.appendChild(btnStyle);
+    row.appendChild(btnExport);
+    row.appendChild(btnDel);
+
+    li.appendChild(row);
     ul.appendChild(li);
 }
 
-// ===== Upload GPX handler =====
-document.getElementById("btnUpload").onclick = () => {
-    const fileInput = document.getElementById("gpxFile");
-    const file = fileInput.files[0];
-    if (!file) return alert("Pilih file GPX dulu.");
+// Toggle show/hide
+function toggleFile(id, show){
+    const meta = uploadedFiles[id];
+    if(!meta) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-        const text = reader.result;
-        const dom = new DOMParser().parseFromString(text, "text/xml");
-        const geojson = toGeoJSON.gpx(dom);
-
-        // create per-file group (but don't add to editableLayers yet via tmp)
-        const created = createFileGroupFromGeoJSON(geojson, {
-            style: { color: "blue", weight: 3 },
-            pointToLayer: function (feature, latlng) {
-                return L.circleMarker(latlng, { radius: 5 });
-            }
-        });
-
-        // compute bounds if possible
-        var bounds = null;
-        try { bounds = created.tmpGeo.getBounds(); } catch (e) { bounds = null; }
-
-        // generate id
-        const id = Date.now() + '-' + Math.floor(Math.random()*1000);
-
-        // simpan metadata
-        uploadedFiles[id] = {
-            name: file.name,
-            group: created.group,
-            bounds: bounds
-        };
-
-        // add to map and editableLayers (default: visible)
-        uploadedFiles[id].group.eachLayer(function (layer) {
+    meta.group.eachLayer(layer=>{
+        if(show){
             map.addLayer(layer);
             editableLayers.addLayer(layer);
+        } else {
+            map.removeLayer(layer);
+            editableLayers.removeLayer(layer);
+        }
+    });
+}
+
+// Zoom
+function zoomFile(id){
+    const meta = uploadedFiles[id];
+    if(meta.bounds && meta.bounds.isValid()) map.fitBounds(meta.bounds);
+}
+
+// Edit Style (warna & ketebalan)
+function editStyle(id){
+    const meta = uploadedFiles[id];
+    if(!meta) return;
+
+    const warna = prompt("Warna (misal: red, blue, #00ff00):", meta.color);
+    if(!warna) return;
+
+    const weight = prompt("Ketebalan garis:", meta.weight);
+    if(!weight) return;
+
+    meta.color = warna;
+    meta.weight = parseInt(weight);
+
+    // Terapkan styling baru
+    meta.group.eachLayer(layer=>{
+        if(layer.setStyle){
+            layer.setStyle({ color:meta.color, weight:meta.weight });
+        }
+        if(layer.setRadius){
+            layer.setStyle({ color:meta.color });
+        }
+    });
+}
+
+// Export KML per file
+function exportKML(id){
+    const meta = uploadedFiles[id];
+    if(!meta) return;
+
+    const gj = meta.group.toGeoJSON();
+    const kml = tokml(gj);
+    saveAs(new Blob([kml],{type:"application/vnd.google-earth.kml+xml"}), meta.name + ".kml");
+}
+
+// Hapus file
+function deleteFile(id){
+    if(!confirm("Hapus file ini?")) return;
+
+    const meta = uploadedFiles[id];
+    if(!meta) return;
+
+    meta.group.eachLayer(layer=>{
+        map.removeLayer(layer);
+        editableLayers.removeLayer(layer);
+    });
+
+    delete uploadedFiles[id];
+    const el = document.getElementById("file-" + id);
+    if(el) el.remove();
+}
+
+// ===== UPLOAD GPX =====
+document.getElementById("btnUpload").onclick = ()=>{
+    const inp = document.getElementById("gpxFile");
+    const file = inp.files[0];
+    if(!file) return alert("Pilih file GPX");
+
+    const reader = new FileReader();
+    reader.onload = ()=>{
+        const dom = new DOMParser().parseFromString(reader.result, "text/xml");
+        const geojson = toGeoJSON.gpx(dom);
+
+        const id = Date.now();
+        const color = "#0077ff";
+
+        const group = createGroupFromGeoJSON(geojson, color);
+        const bounds = group.getBounds();
+
+        uploadedFiles[id] = {
+            name:file.name,
+            group:group,
+            bounds:bounds,
+            color:color,
+            weight:3
+        };
+
+        // Tampilkan layer default
+        group.eachLayer(l=>{
+            map.addLayer(l);
+            editableLayers.addLayer(l);
         });
 
-        // add UI entry
-        addFileListEntry(id, file.name);
+        addFileEntry(id, file.name);
 
-        // fit bounds if exists
-        if (bounds && bounds.isValid && bounds.isValid()) {
-            map.fitBounds(bounds);
-        } else if (geojson.features && geojson.features.length) {
-            // fallback: center to first coord
-            const f = geojson.features[0];
-            if (f.geometry && f.geometry.coordinates) {
-                const c = f.geometry.coordinates;
-                map.setView([c[1], c[0]], 15);
-            }
-        }
+        if(bounds.isValid()) map.fitBounds(bounds);
 
-        // reset input so same file can be uploaded again if needed
-        fileInput.value = '';
+        inp.value = "";
     };
 
     reader.readAsText(file);
-};
-
-// ===== Buffer, Clear, Export =====
-document.getElementById("btnBuffer").onclick = () => {
-    if (editableLayers.getLayers().length === 0)
-        return alert("Tidak ada layer untuk dibuffer.");
-
-    const geojson = editableLayers.toGeoJSON();
-    const buffered = turf.buffer(geojson, 20, { units: 'meters' });
-
-    // tambahkan hasil buffer ke satu group baru (file-like)
-    const tmp = L.geoJSON(buffered, {
-        style: { color: "red", weight: 2, fillOpacity: 0.2 }
-    });
-
-    // tambahkan tiap sublayer ke editableLayers AND map
-    tmp.eachLayer(function (layer) {
-        map.addLayer(layer);
-        editableLayers.addLayer(layer);
-    });
-};
-
-document.getElementById("btnClear").onclick = () => {
-    // clear map and editableLayers, also clear uploadedFiles list UI and metadata
-    editableLayers.eachLayer(function (layer) {
-        if (map.hasLayer(layer)) map.removeLayer(layer);
-    });
-    editableLayers.clearLayers();
-
-    // remove UI list entries
-    var ul = document.getElementById('fileList');
-    ul.innerHTML = '';
-    uploadedFiles = {};
-};
-
-document.getElementById("btnDownloadKml").onclick = () => {
-    if (editableLayers.getLayers().length === 0) return alert("Tidak ada data untuk diekspor.");
-    const geojson = editableLayers.toGeoJSON();
-    const kml = tokml(geojson);
-    const blob = new Blob([kml], { type: "application/vnd.google-earth.kml+xml" });
-    saveAs(blob, "hasil.kml");
 };
