@@ -4,30 +4,45 @@
   <meta charset="utf-8" />
   <title>Mini ArcGIS – GPX Processor</title>
 
-  <!-- Leaflet 1.7.1 (VERSI KOMPATIBEL) -->
+  <!-- Leaflet 1.7.1 -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
 
-  <!-- Leaflet.draw 1.0.4 (KOMPATIBEL DENGAN 1.7.1) -->
+  <!-- Leaflet.draw 1.0.4 -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
-  <!-- Library GIS -->
+  <!-- GIS libs -->
   <script src="https://unpkg.com/togeojson@0.16.0/togeojson.js"></script>
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
   <script src="https://unpkg.com/tokml@0.4.0/tokml.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
   <link rel="stylesheet" href="style.css">
+
   <style>
-    /* tambahan: tampilkan list file di sidebar */
-    #fileList { list-style: none; padding: 0; margin: 0; }
-    #fileList li { display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid #eee; }
-    #fileList li label { flex:1; cursor:pointer; }
-    .btn-small { font-size:12px; padding:4px 6px; border:1px solid #bbb; background:#fff; border-radius:4px; cursor:pointer; }
+    #fileList { list-style:none; padding:0; margin:0; }
+    #fileList li {
+        display:flex; 
+        flex-direction:column;
+        padding:6px 4px;
+        border-bottom:1px solid #ddd;
+        gap:4px;
+    }
+    .file-header { display:flex; align-items:center; gap:6px; }
+    .file-header label { flex:1; cursor:pointer; }
+    .btn-row { display:flex; gap:6px; padding-left:22px; }
+    .btn-small {
+        font-size:11px; 
+        padding:4px 6px; 
+        border:1px solid #aaa; 
+        background:#fff; 
+        border-radius:4px; 
+        cursor:pointer;
+    }
     .btn-small:hover { background:#f0f0f0; }
-    .meta { font-size:12px; color:#666; }
   </style>
+
 </head>
 
 <body>
@@ -37,20 +52,17 @@
 
       <label>Upload GPX:</label><br>
       <input type="file" id="gpxFile" accept=".gpx"><br><br>
-      <button id="btnUpload">Tampilkan GPX</button>
+      <button id="btnUpload">Upload & Tampilkan</button>
       <hr>
 
       <h4>File Terupload</h4>
       <ul id="fileList"></ul>
       <hr>
 
-      <h4>Pengolahan Peta</h4>
-      <button id="btnBuffer">Buffer 20m</button><br><br>
-      <button id="btnClear">Hapus Semua Layer</button>
-      <hr>
-
-      <h4>Export</h4>
-      <button id="btnDownloadKml">Download KML</button>
+      <h4>Edit Geometri</h4>
+      <p style="font-size:12px;color:#666;margin:0;">
+        Gunakan toolbar gambar untuk edit/move polygon/polyline.
+      </p>
     </div>
 
     <div id="map"></div>
