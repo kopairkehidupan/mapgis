@@ -8,6 +8,11 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   crossOrigin: true
 }).addTo(map);
 
+// Remove DOM edit markers from Leaflet.draw (convert to circleMarker)
+L.Edit.SimpleShape.prototype._createMoveMarker = function () {};
+L.Edit.SimpleShape.prototype._createResizeMarker = function () {};
+L.Edit.PolyVerticesEdit.prototype._initMarkers = function () {};
+
 // Editable group for Leaflet.draw (will contain canvas-rendered layers)
 var editableLayers = new L.FeatureGroup().addTo(map);
 
@@ -19,7 +24,7 @@ L.GeoJSON.prototype.options = L.Util.extend({}, L.GeoJSON.prototype.options, {
 // Draw control (works with canvas renderer)
 var drawControl = new L.Control.Draw({
   edit: { featureGroup: editableLayers },
-  draw: { polygon: true, polyline: true, rectangle: true, marker: true, circle: false }
+  draw: { polygon: true, polyline: true, rectangle: true, marker: false, circle: false }
 });
 map.addControl(drawControl);
 map.on(L.Draw.Event.CREATED, function (e) {
