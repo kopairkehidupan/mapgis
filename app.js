@@ -290,6 +290,9 @@ el('#btnUpload').onclick = function(){
     var dom = new DOMParser().parseFromString(reader.result,'text/xml');
     var geojson = toGeoJSON.gpx(dom);
 
+    // 🔥 KONVERSI OTOMATIS DI SINI
+    geojson = convertLineToPolygonGeoJSON(geojson);
+
     var id = Date.now() + '-' + Math.floor(Math.random()*1000);
 
     var metaDefaults = {
@@ -301,10 +304,7 @@ el('#btnUpload').onclick = function(){
       markerSymbol:'circle'
     };
 
-    // group hasil perbaikan
     var group = createGroupFromGeoJSON(geojson, metaDefaults);
-
-    // SAFE: FeatureGroup PASTI punya getBounds()
     var bounds = group.getBounds();
 
     uploadedFiles[id] = {
@@ -319,19 +319,16 @@ el('#btnUpload').onclick = function(){
       markerSymbol: metaDefaults.markerSymbol
     };
 
-    // tampilkan layer
     group.eachLayer(function(l){
       map.addLayer(l);
       editableLayers.addLayer(l);
     });
 
-    // buat card UI
     addFileCard(id, {
       name: file.name,
       summary: (bounds && bounds.isValid() ? "Bounds available" : "No bounds")
     });
 
-    // zoom
     if(bounds && bounds.isValid()) map.fitBounds(bounds);
 
     fi.value = '';
@@ -345,5 +342,43 @@ map.on('click', function(){ /* keep panel open to edit; optionally close */ });
 
 // Optional: keyboard Esc closes props
 document.addEventListener('keydown', function(e){ if(e.key === 'Escape'){ closeProperties(); } });
+
+function convertLineToPolygonGeoJSON(gj) {
+    if (!gj || !gj.features) return gj;
+
+    var newFeatures = [];
+
+    gj.features.forEach(function (f) {
+        if (!f.geometry) return;
+
+        // Jika LineString → jadikan Polygon
+        if (f.geometry.type === "LineString") {
+            var coords = f.geometry.coordinates;
+
+            if (coords.length >= 3) {
+                var ring = coords.slice();
+                ring.push(coords[0]); // Tutup polygon
+
+                newFeatures.push({
+                    type: "Feature",
+                    properties: f.properties || {},
+                    geometry: {
+                        type: "Polygon",
+                        coordinates: [ring]
+                    }
+                });
+            } else {
+                newFeatures.push(f);
+            }
+        } else {
+            newFeatures.push(f);
+        }
+    });
+
+    return {
+        type: "FeatureCollection",
+        features: newFeatures
+    };
+}
 
 // End of app.js
