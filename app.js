@@ -19,7 +19,7 @@ var lastSelectedId = null;
 // --- Helpers: create group from GeoJSON, adding each sublayer to a LayerGroup ---
 function createGroupFromGeoJSON(geojson, styleMeta){
   styleMeta = styleMeta || {};
-  var group = L.layerGroup();
+  var group = L.featureGroup();
   var base = L.geoJSON(geojson, {
     style: function(f){ return { color: styleMeta.color || '#0077ff', weight: styleMeta.weight || 3, dashArray: styleMeta.dashArray || null, fillColor: styleMeta.fillColor || (styleMeta.color || '#0077ff'), fillOpacity: styleMeta.fillOpacity || 0.4 }; },
     pointToLayer: function(f,latlng){
