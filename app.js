@@ -381,4 +381,185 @@ function convertLineToPolygonGeoJSON(gj) {
     };
 }
 
+// === Print to A3 PDF (A3-L1 layout) ===
+
+// Path file uploaded (developer: gunakan path ini di server/tool wrapper)
+const templatePdfUrl = '/mnt/data/SAIL A2 W (1).pdf'; // <-- path upload Anda
+
+// Helper: format meter to human (m/Ha)
+function fmtArea(m2) {
+  if (m2 >= 10000) return (m2/10000).toFixed(2) + ' Ha';
+  return Math.round(m2) + ' m²';
+}
+
+// Hitung approximate meters-per-pixel di lat & zoom (WebMercator approximation)
+function metersPerPixelAtLat(lat, zoom) {
+  return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+}
+
+// Buat legend entries dari uploadedFiles (yang ada di memory)
+function buildLegendEntries() {
+  var items = [];
+  for (var id in uploadedFiles) {
+    if (!uploadedFiles.hasOwnProperty(id)) continue;
+    var m = uploadedFiles[id];
+    items.push({
+      name: m.name || ('layer-' + id),
+      color: m.color || '#0077ff'
+    });
+  }
+  return items;
+}
+
+// Fungsi utama export
+async function exportMapToA3PDF() {
+  // ukuran A3 dalam mm (landscape)
+  const pdfWidthMM = 420;
+  const pdfHeightMM = 297;
+  const marginMM = 12;
+
+  // PILIH area peta dalam PDF: lebar 280mm, sisanya untuk legenda & teks (kanan)
+  const mapAreaMM = { x: marginMM, y: marginMM + 8, w: 280, h: pdfHeightMM - marginMM*2 - 16 };
+
+  // inisialisasi jsPDF
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' });
+
+  // --- 1) ambil canvas peta menggunakan leaflet-image ---
+  // kita pakai resolusi tinggi: scale factor untuk canvas besar (mis. 2x)
+  const scaleFactor = 2;
+
+  // use leaflet-image
+  leafletImage(map, function(err, canvas) {
+    if (err) {
+      alert('Gagal mengambil gambar peta: ' + err);
+      return;
+    }
+
+    // membuat canvas output beresolusi lebih tinggi:
+    const w = canvas.width;
+    const h = canvas.height;
+    // copy ke temp canvas dengan upscale
+    const tmp = document.createElement('canvas');
+    tmp.width = w * scaleFactor;
+    tmp.height = h * scaleFactor;
+    const tctx = tmp.getContext('2d');
+    // upscale draw
+    tctx.scale(scaleFactor, scaleFactor);
+    tctx.drawImage(canvas, 0, 0);
+
+    const imgData = tmp.toDataURL('image/png');
+
+    // konversi dimensi px -> mm: kita ingin menyesuaikan lebar gambar ke mapAreaMM.w
+    // pixel -> mm factor:
+    const pxPerMM = (tmp.width) / (mapAreaMM.w * (96/25.4) * 25.4 / 96); // simplifikasi (we'll calc simpler)
+    // simpler: compute aspect and scale by mm width:
+    const imgAspect = tmp.width / tmp.height;
+    const mapWmm = mapAreaMM.w;
+    const mapHmm = mapWmm / imgAspect;
+
+    // kalau terlalu tinggi, ubah supaya cocok height
+    let drawW = mapWmm;
+    let drawH = mapHmm;
+    if (drawH > mapAreaMM.h) {
+      drawH = mapAreaMM.h;
+      drawW = drawH * imgAspect;
+    }
+
+    // --- 2) tempatkan gambar peta di PDF ---
+    pdf.addImage(imgData, 'PNG', mapAreaMM.x, mapAreaMM.y, drawW, drawH);
+
+    // --- 3) Draw border around map ---
+    pdf.setDrawColor(0);
+    pdf.setLineWidth(0.8);
+    pdf.rect(mapAreaMM.x - 1, mapAreaMM.y - 1, drawW + 2, drawH + 2);
+
+    // --- 4) Title di kanan atas (sejajar kanan) ---
+    pdf.setFontSize(22);
+    pdf.setFont('helvetica', 'bold');
+    const title = 'Peta Baku Lahan';
+    pdf.text(title, pdfWidthMM - marginMM, marginMM + 6, { align: 'right' });
+
+    // --- 5) Legend otomatis (di kolom kanan) ---
+    const legendX = mapAreaMM.x + drawW + 8;
+    let legendY = mapAreaMM.y;
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica','normal');
+    pdf.text('Legenda:', legendX, legendY);
+    legendY += 6;
+
+    const legend = buildLegendEntries();
+    legend.forEach(function(item, i){
+      // kotak warna
+      const boxSize = 6;
+      pdf.setFillColor(item.color);
+      pdf.rect(legendX, legendY - 4, boxSize, boxSize, 'F');
+      pdf.setDrawColor(0);
+      pdf.rect(legendX, legendY - 4, boxSize, boxSize);
+      pdf.setTextColor(0);
+      pdf.text(item.name, legendX + boxSize + 4, legendY + 1);
+      legendY += 8;
+    });
+
+    legendY += 8;
+
+    // --- 6) Scale bar (perkiraan) ditempatkan kiri bawah map ---
+    // we hitung meters per pixel di center
+    const center = map.getCenter();
+    const zoom = map.getZoom();
+    const mPerPx = metersPerPixelAtLat(center.lat, zoom);
+    // in canvas pixel units (tmp.width) corresponds to drawW mm. Convert mm -> px (approx 3.78 px per mm at 96dpi)
+    // simpler: tentukan scaleBar length in mm (target)
+    const targetMm = 40; // ~40 mm scale bar
+    // convert mm to meters using map scale:
+    // tmp.width px => drawW mm  => metersOnMap = tmp.width * mPerPx
+    const metersOnImage = tmp.width * mPerPx;
+    const metersPerMmOnImage = metersOnImage / drawW; // meters per mm
+    const scaleMeters = Math.round(metersPerMmOnImage * targetMm / 10) * 10; // round to nearest 10m
+    // draw scale bar
+    const scaleX = mapAreaMM.x + 12;
+    const scaleY = mapAreaMM.y + drawH - 12;
+    pdf.setFontSize(10);
+    pdf.text('Scale ≈ 1:' + Math.round((metersPerMmOnImage * 1000) * (pdf.internal.getScaleFactor())), scaleX, scaleY - 6);
+    // scale bar rectangle (convert targetMm to pdf units)
+    pdf.setFillColor(0);
+    pdf.rect(scaleX, scaleY, targetMm, 3, 'F');
+    pdf.setFontSize(9);
+    pdf.text(scaleMeters + ' m', scaleX + targetMm + 4, scaleY + 3);
+
+    // --- 7) North arrow (kanan atas peta area) ---
+    const naX = mapAreaMM.x + drawW - 18;
+    const naY = mapAreaMM.y + 8;
+    // simple triangle arrow + letter N
+    pdf.setFillColor(0);
+    pdf.triangle(naX, naY+12, naX+8, naY, naX+16, naY+12, 'F');
+    pdf.setFontSize(10);
+    pdf.text('N', naX+8, naY+18, { align: 'center' });
+
+    // --- 8) Coordinates labels di tepi (WGS84) — tampilkan bounding box corners ---
+    const b = map.getBounds();
+    pdf.setFontSize(9);
+    pdf.text('NW: ' + b.getNorth().toFixed(6) + ', ' + b.getWest().toFixed(6), mapAreaMM.x, mapAreaMM.y - 2);
+    pdf.text('NE: ' + b.getNorth().toFixed(6) + ', ' + b.getEast().toFixed(6), mapAreaMM.x + drawW, mapAreaMM.y - 2, { align: 'right' });
+    pdf.text('SW: ' + b.getSouth().toFixed(6) + ', ' + b.getWest().toFixed(6), mapAreaMM.x, mapAreaMM.y + drawH + 8);
+    pdf.text('SE: ' + b.getSouth().toFixed(6) + ', ' + b.getEast().toFixed(6), mapAreaMM.x + drawW, mapAreaMM.y + drawH + 8, { align: 'right' });
+
+    // --- 9) Footer: tanggal & template PDF path (server akan transform) ---
+    pdf.setFontSize(9);
+    const now = new Date();
+    pdf.text('Dicetak: ' + now.toLocaleString(), marginMM, pdfHeightMM - marginMM + 2);
+    pdf.text('Template: ' + templatePdfUrl, pdfWidthMM - marginMM, pdfHeightMM - marginMM + 2, { align: 'right' });
+
+    // --- 10) Save PDF ---
+    pdf.save('peta_baku_lahan_A3.pdf');
+
+  }); // end leafletImage
+}
+
+// tombol pemicu
+document.getElementById('btnPrintA3').addEventListener('click', function(){
+  // klik -> mulai export
+  exportMapToA3PDF();
+});
+
 // End of app.js
