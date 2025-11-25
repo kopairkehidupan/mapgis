@@ -1,0 +1,27 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: Arial, sans-serif;
+}
+
+#container {
+    display: flex;
+    height: 100vh;
+}
+
+#sidebar {
+    width: 300px;
+    background: #f7f7f7;
+    padding: 15px;
+    border-right: 1px solid #ccc;
+    overflow-y: auto;
+}
+
+#sidebar h3 {
+    margin-top: 0;
+}
+
+#map {
+    flex: 1;
+}
