@@ -416,35 +416,40 @@ async function exportPdfFromLayers() {
     // --------- Gambar Semua Polygon & Polyline ---------
     gj.features.forEach(f => {
         if (!f.geometry) return;
-
+    
         const type = f.geometry.type;
-
+    
+        // ---- POLYGON ----
         if (type === "Polygon") {
             f.geometry.coordinates.forEach(ring => {
-                const pts = ring.map(c => project(c));
-
-                page.moveTo(pts[0][0], pts[0][1]);
-                for (let i = 1; i < pts.length; i++) {
-                    page.lineTo(pts[i][0], pts[i][1]);
-                }
-
-                // fill + stroke
-                page.drawSvgPath("", {
-                    borderColor: rgb(0.1, 0.3, 0.8),
-                    color: rgb(0.6, 0.8, 1),
+                const pts = ring.map(c => {
+                    const [x, y] = project(c);
+                    return { x, y };
+                });
+    
+                page.drawPolygon(pts, {
+                    color: rgb(0.6, 0.8, 1),            // fill
+                    borderColor: rgb(0.1, 0.3, 0.8),   // stroke
+                    borderWidth: 1
                 });
             });
         }
-
+    
+        // ---- LINESTRING ----
         else if (type === "LineString") {
-            const pts = f.geometry.coordinates.map(c => project(c));
-            page.moveTo(pts[0][0], pts[0][1]);
-            pts.forEach(p => page.lineTo(p[0], p[1]));
-
-            page.drawSvgPath("", {
-                borderColor: rgb(1, 0, 0),
-                borderWidth: 2
+            const pts = f.geometry.coordinates.map(c => {
+                const [x, y] = project(c);
+                return { x, y };
             });
+    
+            for (let i = 0; i < pts.length - 1; i++) {
+                page.drawLine({
+                    start: pts[i],
+                    end: pts[i + 1],
+                    thickness: 2,
+                    color: rgb(1, 0, 0)
+                });
+            }
         }
     });
 
