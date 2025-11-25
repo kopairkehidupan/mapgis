@@ -22,8 +22,21 @@ var drawControl = new L.Control.Draw({
 map.addControl(drawControl);
 
 map.on(L.Draw.Event.CREATED, function (e) {
+    // tambahkan layer hasil draw ke grup edit
     editableLayers.addLayer(e.layer);
 });
+
+
+// --- Helper: tambahkan semua sublayer GeoJSON ke editableLayers ---
+function addGeoJSONToEditableLayers(geojson, options) {
+    options = options || {};
+    var temp = L.geoJSON(geojson, options);
+    // setiap sublayer (polyline/polygon/marker) ditambahkan tersendiri
+    temp.eachLayer(function (layer) {
+        editableLayers.addLayer(layer);
+    });
+    return temp;
+}
 
 
 // --- Upload GPX ---
@@ -39,11 +52,28 @@ document.getElementById("btnUpload").onclick = () => {
         // konversi GPX -> GeoJSON
         const geojson = toGeoJSON.gpx(dom);
 
-        window.gpxLayer = L.geoJSON(geojson, {
-            style: { color: "blue", weight: 3 }
-        }).addTo(editableLayers);
+        // jangan langsung addTo(editableLayers) — tambahkan tiap sublayer
+        const tmp = addGeoJSONToEditableLayers(geojson, {
+            style: { color: "blue", weight: 3 },
+            pointToLayer: function (feature, latlng) {
+                return L.circleMarker(latlng, { radius: 5 });
+            }
+        });
 
-        map.fitBounds(window.gpxLayer.getBounds());
+        // sesuaikan tampilan peta jika ada bounds
+        try {
+            map.fitBounds(tmp.getBounds());
+        } catch (err) {
+            // jika tidak ada bounds (mis. hanya titik), pusatkan pada titik pertama
+            if (geojson.features && geojson.features.length) {
+                const f = geojson.features[0];
+                if (f.geometry && f.geometry.coordinates) {
+                    const c = f.geometry.coordinates;
+                    // koordinat GPX biasanya [lon, lat]
+                    map.setView([c[1], c[0]], 15);
+                }
+            }
+        }
     };
 
     reader.readAsText(file);
@@ -55,12 +85,23 @@ document.getElementById("btnBuffer").onclick = () => {
     if (editableLayers.getLayers().length === 0)
         return alert("Tidak ada layer untuk dibuffer.");
 
+    // gabungkan semua feature dari editableLayers menjadi satu GeoJSON
     const geojson = editableLayers.toGeoJSON();
+
+    // turf.buffer expects a Feature or FeatureCollection
     const buffered = turf.buffer(geojson, 20, { units: 'meters' });
 
-    L.geoJSON(buffered, {
+    // tambahkan hasil buffer sebagai sublayer terpisah
+    const tmp = L.geoJSON(buffered, {
         style: { color: "red", weight: 2, fillOpacity: 0.2 }
-    }).addTo(editableLayers);
+    });
+
+    tmp.eachLayer(function (layer) {
+        editableLayers.addLayer(layer);
+    });
+
+    // centering optional
+    try { map.fitBounds(tmp.getBounds()); } catch (e) { /* ignore */ }
 };
 
 
@@ -72,6 +113,8 @@ document.getElementById("btnClear").onclick = () => {
 
 // --- Download KML ---
 document.getElementById("btnDownloadKml").onclick = () => {
+    if (editableLayers.getLayers().length === 0) return alert("Tidak ada data untuk diekspor.");
+
     const geojson = editableLayers.toGeoJSON();
     const kml = tokml(geojson);
 
