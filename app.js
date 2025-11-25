@@ -1,37 +1,59 @@
-// app.js (patched) -- Canvas renderer penuh
+// app.js (FULL PATCHED)
 
 // --- Initialization ---
-// Force canvas renderer at map level
+// Force canvas renderer at map level and enable CORS on tile layer
 var map = L.map('map', { preferCanvas: true }).setView([0.5, 101.4], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 22,
   crossOrigin: true
 }).addTo(map);
 
-// Remove DOM edit markers from Leaflet.draw (convert to circleMarker)
-L.Edit.SimpleShape.prototype._createMoveMarker = function () {};
-L.Edit.SimpleShape.prototype._createResizeMarker = function () {};
-L.Edit.PolyVerticesEdit.prototype._initMarkers = function () {};
-
 // Editable group for Leaflet.draw (will contain canvas-rendered layers)
 var editableLayers = new L.FeatureGroup().addTo(map);
 
-// Ensure GeoJSON uses canvas renderer by default (safe fallback)
-L.GeoJSON.prototype.options = L.Util.extend({}, L.GeoJSON.prototype.options, {
-  renderer: L.canvas({ padding: 0.5 })
-});
+// --- HACK: prevent Leaflet.draw and edit handlers from creating DOM markers ---
+// (these prototypes are overwritten to avoid insertion of L.Marker DOM icons,
+//  which break leaflet-image)
+if (L.Edit && L.Edit.SimpleShape) {
+  L.Edit.SimpleShape.prototype._createMoveMarker = function () {};
+  L.Edit.SimpleShape.prototype._createResizeMarker = function () {};
+}
+if (L.Edit && L.Edit.PolyVerticesEdit) {
+  L.Edit.PolyVerticesEdit.prototype._initMarkers = function () {};
+}
 
-// Draw control (works with canvas renderer)
+// Ensure GeoJSON uses canvas renderer by default (safe fallback)
+if (L.GeoJSON) {
+  L.GeoJSON.prototype.options = L.Util.extend({}, L.GeoJSON.prototype.options, {
+    renderer: L.canvas({ padding: 0.5 })
+  });
+}
+
+// Draw control: disable marker tool to avoid DOM markers
 var drawControl = new L.Control.Draw({
   edit: { featureGroup: editableLayers },
-  draw: { polygon: true, polyline: true, rectangle: true, marker: false, circle: false }
+  draw: {
+    polygon: true,
+    polyline: true,
+    rectangle: true,
+    marker: false,   // IMPORTANT: disable marker
+    circle: false
+  }
 });
 map.addControl(drawControl);
+
+// Ensure layers created from draw use canvas renderer
 map.on(L.Draw.Event.CREATED, function (e) {
   var layer = e.layer;
-  // ensure layer uses canvas renderer when it's a path
+  // if layer is a path (polyline/polygon), set renderer to canvas
   if (layer.setStyle) {
-    layer.setStyle(layer.options || {});
+    try {
+      layer.options = layer.options || {};
+      layer.options.renderer = L.canvas({ padding: 0.5 });
+      layer.setStyle(layer.options);
+    } catch (err) {
+      // ignore
+    }
   }
   editableLayers.addLayer(layer);
 });
@@ -41,12 +63,11 @@ var uploadedFiles = {}; // id -> { name, group:LayerGroup, bounds, color, weight
 var lastSelectedId = null;
 
 // --- Helpers: create group from GeoJSON, adding each sublayer to a FeatureGroup ---
-// This will create explicit L.Polygon / L.Polyline / L.CircleMarker with renderer: L.canvas()
+// Force creation of L.Polygon / L.Polyline / L.CircleMarker with renderer: L.canvas()
 function createGroupFromGeoJSON(geojson, styleMeta) {
   styleMeta = styleMeta || {};
   var group = L.featureGroup();
 
-  // helper to create style object
   function getStyle() {
     return {
       color: styleMeta.color || '#0077ff',
@@ -68,24 +89,17 @@ function createGroupFromGeoJSON(geojson, styleMeta) {
     if (geom.type === 'Point') {
       var c = geom.coordinates;
       var latlng = L.latLng(c[1], c[0]);
-      var cm = L.circleMarker(latlng, {
+      var cm = L.circleMarker(latlng, L.Util.extend({
         radius: 6,
-        color: styleMeta.color || '#0077ff',
-        fillColor: styleMeta.fillColor || (styleMeta.color || '#0077ff'),
-        fillOpacity: styleMeta.fillOpacity || 0.8,
-        weight: 1,
         renderer: L.canvas({ padding: 0.5 })
-      });
+      }, getStyle()));
       cm.feature = f;
       group.addLayer(cm);
-      return;
+
     } else if (geom.type === 'MultiPoint') {
       geom.coordinates.forEach(function (c) {
         var latlng = L.latLng(c[1], c[0]);
-        var cm = L.circleMarker(latlng, L.Util.extend({
-          radius: 5,
-          renderer: L.canvas({ padding: 0.5 })
-        }, getStyle()));
+        var cm = L.circleMarker(latlng, L.Util.extend({ radius: 5, renderer: L.canvas({ padding: 0.5 }) }, getStyle()));
         cm.feature = f;
         group.addLayer(cm);
       });
@@ -105,7 +119,6 @@ function createGroupFromGeoJSON(geojson, styleMeta) {
       });
 
     } else if (geom.type === 'Polygon') {
-      // coords: [ [ [lng,lat], ... ] , ... ]
       var rings = geom.coordinates.map(function (ring) {
         return ring.map(function (c) { return [c[1], c[0]]; });
       });
@@ -122,8 +135,9 @@ function createGroupFromGeoJSON(geojson, styleMeta) {
         poly.feature = f;
         group.addLayer(poly);
       });
+
     } else {
-      // fallback: try to add as generic geoJSON layer (renderer enforced)
+      // fallback
       var layer = L.geoJSON(f, {
         style: getStyle(),
         pointToLayer: function (feat, latlng) {
@@ -181,7 +195,6 @@ function addFileCard(id, meta) {
   var ul = el('#fileList');
   var li = document.createElement('li'); li.className = 'file-card'; li.id = 'file-' + id;
 
-  // header row
   var header = document.createElement('div'); header.className = 'file-header';
   var chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = true;
   chk.onchange = function () { toggleFile(id, chk.checked); };
@@ -198,7 +211,6 @@ function addFileCard(id, meta) {
   header.appendChild(chk); header.appendChild(title); header.appendChild(actions);
   li.appendChild(header);
 
-  // folder contents (infos)
   var folder = document.createElement('div'); folder.className = 'folder-contents';
   var info = document.createElement('div'); info.className = 'muted';
   info.innerText = meta.summary || '';
@@ -208,7 +220,6 @@ function addFileCard(id, meta) {
   ul.appendChild(li);
 }
 
-// Toggle display/hide file
 function toggleFile(id, show) {
   var meta = uploadedFiles[id]; if (!meta) return;
   meta.group.eachLayer(function (layer) {
@@ -217,10 +228,8 @@ function toggleFile(id, show) {
   });
 }
 
-// Zoom to file
 function zoomFile(id) { var meta = uploadedFiles[id]; if (!meta) return; if (meta.bounds && meta.bounds.isValid()) map.fitBounds(meta.bounds); }
 
-// delete file
 function deleteFile(id) {
   if (!confirm('Hapus file?')) return;
   var meta = uploadedFiles[id]; if (!meta) return;
@@ -230,7 +239,6 @@ function deleteFile(id) {
   if (lastSelectedId === id) closeProperties();
 }
 
-// open rename inline
 function openRename(id) {
   var card = document.getElementById('file-' + id);
   if (!card) return;
@@ -256,13 +264,11 @@ function finishRename(id, val) {
 }
 function cancelRename(id, old) { var card = document.getElementById('file-' + id); if (!card) return; var input = card.querySelector('input[type=text]'); var title = document.createElement('div'); title.className = 'file-title'; title.innerText = old; title.onclick = function () { openRename(id); }; input.replaceWith(title); }
 
-// --- Properties panel ---
 function openProperties(id) {
   var meta = uploadedFiles[id]; if (!meta) return;
   lastSelectedId = id;
   var panel = el('#propertiesPanel'); panel.classList.remove('hidden');
   el('#propName').value = meta.name;
-  // stats: counts, length, area
   var gj = meta.group.toGeoJSON();
   var cnt = gj.features.length;
   var len = 0, area = 0;
@@ -272,7 +278,6 @@ function openProperties(id) {
   });
   el('#propStats').innerText = 'Features: ' + cnt + '  •  Length ≈ ' + Math.round(len) + ' m  •  Area ≈ ' + Math.round(area) + ' m²';
 
-  // style controls set to current meta
   el('#styleStrokeColor').value = meta.color || '#0077ff';
   el('#styleStrokeWidth').value = meta.weight || 3;
   el('#strokeWidthVal').innerText = meta.weight || 3;
@@ -285,7 +290,6 @@ function openProperties(id) {
 
 function closeProperties() { lastSelectedId = null; el('#propertiesPanel').classList.add('hidden'); }
 
-// hook save name
 el('#propSaveName').onclick = function () {
   if (!lastSelectedId) return;
   var v = el('#propName').value.trim() || uploadedFiles[lastSelectedId].name;
@@ -295,11 +299,9 @@ el('#propSaveName').onclick = function () {
   alert('Nama disimpan.');
 };
 
-// style controls live display
 el('#styleStrokeWidth').oninput = function () { el('#strokeWidthVal').innerText = this.value; };
 el('#styleFillOpacity').oninput = function () { el('#fillOpacityVal').innerText = this.value; };
 
-// apply style to lastSelectedId
 el('#applyStyle').onclick = function () {
   if (!lastSelectedId) return alert('Pilih layer dulu.');
   var meta = uploadedFiles[lastSelectedId];
@@ -327,7 +329,6 @@ el('#applyStyle').onclick = function () {
   alert('Style diterapkan.');
 };
 
-// revert style to defaults
 el('#revertStyle').onclick = function () {
   if (!lastSelectedId) return;
   var meta = uploadedFiles[lastSelectedId];
@@ -336,16 +337,12 @@ el('#revertStyle').onclick = function () {
   el('#applyStyle').click();
 };
 
-// Export buttons
 el('#exportGeojson').onclick = function () { if (!lastSelectedId) return; var meta = uploadedFiles[lastSelectedId]; var gj = meta.group.toGeoJSON(); var blob = new Blob([JSON.stringify(gj, null, 2)], { type: 'application/json' }); saveAs(blob, (meta.name || 'layer') + '.geojson'); };
 el('#exportGpx').onclick = function () { if (!lastSelectedId) return; var meta = uploadedFiles[lastSelectedId]; var gj = meta.group.toGeoJSON(); var gpx = geojsonToGpx(gj, meta.name); saveAs(new Blob([gpx], { type: 'application/gpx+xml' }), (meta.name || 'layer') + '.gpx'); };
 el('#exportKml').onclick = function () { if (!lastSelectedId) return; var meta = uploadedFiles[lastSelectedId]; var gj = meta.group.toGeoJSON(); var kml = tokml(gj); saveAs(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }), (meta.name || 'layer') + '.kml'); };
 el('#deleteLayer').onclick = function () { if (!lastSelectedId) return deleteFile(lastSelectedId); };
 
-function exportAllFor(id) {
-  openProperties(id);
-  // user can click desired export button
-}
+function exportAllFor(id) { openProperties(id); }
 
 // --- Upload handler ---
 el('#btnUpload').onclick = function () {
@@ -407,37 +404,22 @@ el('#btnUpload').onclick = function () {
   reader.readAsText(file);
 };
 
-// close properties if click outside
 map.on('click', function () { /* keep panel open to edit; optionally close */ });
-
-// Optional: keyboard Esc closes props
 document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeProperties(); } });
 
 function convertLineToPolygonGeoJSON(gj) {
   if (!gj || !gj.features) return gj;
-
   var newFeatures = [];
-
   gj.features.forEach(function (f) {
     if (!f.geometry) return;
-
     if (f.geometry.type === "LineString") {
       var coords = f.geometry.coordinates;
-
       if (coords.length >= 3) {
         var ring = coords.slice();
-        // ensure closed ring: if first != last push
         var first = ring[0];
         var last = ring[ring.length - 1];
         if (first[0] !== last[0] || first[1] !== last[1]) ring.push(first);
-        newFeatures.push({
-          type: "Feature",
-          properties: f.properties || {},
-          geometry: {
-            type: "Polygon",
-            coordinates: [ring]
-          }
-        });
+        newFeatures.push({ type: "Feature", properties: f.properties || {}, geometry: { type: "Polygon", coordinates: [ring] } });
       } else {
         newFeatures.push(f);
       }
@@ -445,162 +427,122 @@ function convertLineToPolygonGeoJSON(gj) {
       newFeatures.push(f);
     }
   });
-
-  return {
-    type: "FeatureCollection",
-    features: newFeatures
-  };
+  return { type: "FeatureCollection", features: newFeatures };
 }
 
 // === Print to A3 PDF (A3-L1 layout) ===
+// Path uploaded template (server-side path)
+const templatePdfUrl = '/mnt/data/SAIL A2 W (1).pdf'; // use uploaded file
 
-// Path file uploaded (developer: gunakan path ini di server/tool wrapper)
-const templatePdfUrl = '/mnt/data/SAIL A2 W (1).pdf'; // <-- path upload Anda
-
-// Helper: format meter to human (m/Ha)
-function fmtArea(m2) {
-  if (m2 >= 10000) return (m2 / 10000).toFixed(2) + ' Ha';
-  return Math.round(m2) + ' m²';
-}
-
-// Hitung approximate meters-per-pixel di lat & zoom (WebMercator approximation)
-function metersPerPixelAtLat(lat, zoom) {
-  return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
-}
-
-// Buat legend entries dari uploadedFiles (yang ada di memory)
+function fmtArea(m2) { if (m2 >= 10000) return (m2 / 10000).toFixed(2) + ' Ha'; return Math.round(m2) + ' m²'; }
+function metersPerPixelAtLat(lat, zoom) { return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom); }
 function buildLegendEntries() {
   var items = [];
   for (var id in uploadedFiles) {
     if (!uploadedFiles.hasOwnProperty(id)) continue;
     var m = uploadedFiles[id];
-    items.push({
-      name: m.name || ('layer-' + id),
-      color: m.color || '#0077ff'
-    });
+    items.push({ name: m.name || ('layer-' + id), color: m.color || '#0077ff' });
   }
   return items;
 }
 
-// Fungsi utama export
 async function exportMapToA3PDF() {
-  // ukuran A3 dalam mm (landscape)
-  const pdfWidthMM = 420;
-  const pdfHeightMM = 297;
-  const marginMM = 12;
-
-  // PILIH area peta dalam PDF: lebar 280mm, sisanya untuk legenda & teks (kanan)
+  const pdfWidthMM = 420, pdfHeightMM = 297, marginMM = 12;
   const mapAreaMM = { x: marginMM, y: marginMM + 8, w: 280, h: pdfHeightMM - marginMM * 2 - 16 };
-
-  // inisialisasi jsPDF
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' });
 
-  // --- 1) ambil canvas peta menggunakan leaflet-image ---
-  const scaleFactor = 2;
+  // BEFORE rendering: temporarily hide panes that contain DOM icons
+  var panes = map.getPanes();
+  var markerPane = panes.markerPane;
+  var shadowPane = panes.shadowPane;
+  var overlayPane = panes.overlayPane;
+  var origMarkerDisp, origShadowDisp, origOverlayDisp;
+  if (markerPane) { origMarkerDisp = markerPane.style.display; markerPane.style.display = 'none'; }
+  if (shadowPane) { origShadowDisp = shadowPane.style.display; shadowPane.style.display = 'none'; }
+  // also hide any overlay nodes that might contain HTML icons
+  if (overlayPane) { origOverlayDisp = overlayPane.style.display; overlayPane.style.display = 'none'; }
 
+  // generate canvas via leaflet-image
   leafletImage(map, function (err, canvas) {
-    if (err) {
-      alert('Gagal mengambil gambar peta: ' + err);
+    // restore panes immediately
+    if (markerPane) markerPane.style.display = origMarkerDisp || '';
+    if (shadowPane) shadowPane.style.display = origShadowDisp || '';
+    if (overlayPane) overlayPane.style.display = origOverlayDisp || '';
+
+    if (err || !canvas) {
+      alert('Gagal mengambil gambar peta: ' + (err || 'unknown error'));
       return;
     }
 
-    // upscale to improve resolution
-    const w = canvas.width;
-    const h = canvas.height;
-    const tmp = document.createElement('canvas');
+    // upscale output canvas for quality
+    var scaleFactor = 2;
+    var w = canvas.width, h = canvas.height;
+    var tmp = document.createElement('canvas');
     tmp.width = w * scaleFactor;
     tmp.height = h * scaleFactor;
     var tctx = tmp.getContext('2d');
-    // use imageSmoothingEnabled false for crisp tiles
     tctx.imageSmoothingEnabled = false;
     tctx.scale(scaleFactor, scaleFactor);
     tctx.drawImage(canvas, 0, 0);
 
-    const imgData = tmp.toDataURL('image/png');
+    var imgData = tmp.toDataURL('image/png');
 
-    // dimension calculations
-    const imgAspect = tmp.width / tmp.height;
-    const mapWmm = mapAreaMM.w;
-    const mapHmm = mapWmm / imgAspect;
-
-    let drawW = mapWmm;
-    let drawH = mapHmm;
-    if (drawH > mapAreaMM.h) {
-      drawH = mapAreaMM.h;
-      drawW = drawH * imgAspect;
-    }
+    // compute draw size in PDF mm
+    var imgAspect = tmp.width / tmp.height;
+    var mapWmm = mapAreaMM.w;
+    var mapHmm = mapWmm / imgAspect;
+    var drawW = mapWmm, drawH = mapHmm;
+    if (drawH > mapAreaMM.h) { drawH = mapAreaMM.h; drawW = drawH * imgAspect; }
 
     // add map image
     pdf.addImage(imgData, 'PNG', mapAreaMM.x, mapAreaMM.y, drawW, drawH);
 
     // border
-    pdf.setDrawColor(0);
-    pdf.setLineWidth(0.8);
+    pdf.setDrawColor(0); pdf.setLineWidth(0.8);
     pdf.rect(mapAreaMM.x - 1, mapAreaMM.y - 1, drawW + 2, drawH + 2);
 
     // title
-    pdf.setFontSize(22);
-    pdf.setFont('helvetica', 'bold');
-    const title = 'Peta Baku Lahan';
-    pdf.text(title, pdfWidthMM - marginMM, marginMM + 6, { align: 'right' });
+    pdf.setFontSize(22); pdf.setFont('helvetica', 'bold');
+    pdf.text('Peta Baku Lahan', pdfWidthMM - marginMM, marginMM + 6, { align: 'right' });
 
     // legend
-    const legendX = mapAreaMM.x + drawW + 8;
-    let legendY = mapAreaMM.y;
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('Legenda:', legendX, legendY);
-    legendY += 6;
-
-    const legend = buildLegendEntries();
-    legend.forEach(function (item, i) {
-      const boxSize = 6;
-      pdf.setFillColor(item.color);
-      pdf.rect(legendX, legendY - 4, boxSize, boxSize, 'F');
-      pdf.setDrawColor(0);
-      pdf.rect(legendX, legendY - 4, boxSize, boxSize);
-      pdf.setTextColor(0);
-      pdf.text(item.name, legendX + boxSize + 4, legendY + 1);
+    var legendX = mapAreaMM.x + drawW + 8; var legendY = mapAreaMM.y;
+    pdf.setFontSize(12); pdf.setFont('helvetica', 'normal');
+    pdf.text('Legenda:', legendX, legendY); legendY += 6;
+    var legend = buildLegendEntries();
+    legend.forEach(function (item) {
+      var boxSize = 6;
+      pdf.setFillColor(item.color); pdf.rect(legendX, legendY - 4, boxSize, boxSize, 'F');
+      pdf.setDrawColor(0); pdf.rect(legendX, legendY - 4, boxSize, boxSize);
+      pdf.setTextColor(0); pdf.text(item.name, legendX + boxSize + 4, legendY + 1);
       legendY += 8;
     });
-
     legendY += 8;
 
     // scale bar estimation
-    const center = map.getCenter();
-    const zoom = map.getZoom();
-    const mPerPx = metersPerPixelAtLat(center.lat, zoom);
-
-    const targetMm = 40;
-    const metersOnImage = tmp.width * mPerPx;
-    const metersPerMmOnImage = metersOnImage / drawW;
-    const scaleMeters = Math.round(metersPerMmOnImage * targetMm / 10) * 10;
-
-    const scaleX = mapAreaMM.x + 12;
-    const scaleY = mapAreaMM.y + drawH - 12;
+    var center = map.getCenter(); var zoom = map.getZoom();
+    var mPerPx = metersPerPixelAtLat(center.lat, zoom);
+    var targetMm = 40;
+    var metersOnImage = tmp.width * mPerPx;
+    var metersPerMmOnImage = metersOnImage / drawW;
+    var scaleMeters = Math.round(metersPerMmOnImage * targetMm / 10) * 10;
+    var scaleX = mapAreaMM.x + 12, scaleY = mapAreaMM.y + drawH - 12;
     pdf.setFontSize(10);
-    const scaleApprox = Math.round(metersPerMmOnImage);
+    var scaleApprox = Math.round(metersPerMmOnImage);
     pdf.text('Scale ≈ 1:' + scaleApprox, scaleX, scaleY - 6);
-    pdf.setFillColor(0);
-    pdf.rect(scaleX, scaleY, targetMm, 3, 'F');
-    pdf.setFontSize(9);
-    pdf.text(scaleMeters + ' m', scaleX + targetMm + 4, scaleY + 3);
+    pdf.setFillColor(0); pdf.rect(scaleX, scaleY, targetMm, 3, 'F');
+    pdf.setFontSize(9); pdf.text(scaleMeters + ' m', scaleX + targetMm + 4, scaleY + 3);
 
-    // north arrow
-    const naX = mapAreaMM.x + drawW - 18;
-    const naY = mapAreaMM.y + 8;
-    pdf.setFillColor(0);
-    // draw triangle manually (triangle API may not exist in some jspdf builds)
-    // fallback to drawing polygon with lines:
-    pdf.setDrawColor(0);
-    pdf.setFillColor(0);
-    pdf.lines([[[8, 12], [0, 0], [16, 0]]], naX - 8, naY, null, 'F'); // approximate triangle
-    pdf.setFontSize(10);
-    pdf.text('N', naX + 8, naY + 18, { align: 'center' });
+    // north arrow (simple)
+    var naX = mapAreaMM.x + drawW - 18, naY = mapAreaMM.y + 8;
+    pdf.setDrawColor(0); pdf.setFillColor(0);
+    // draw small triangle (approx)
+    pdf.lines([[[8, 12], [0, 0], [16, 0]]], naX - 8, naY, null, 'F');
+    pdf.setFontSize(10); pdf.text('N', naX + 8, naY + 18, { align: 'center' });
 
-    // coordinates
-    const b = map.getBounds();
+    // coordinates (WGS84) corners
+    var b = map.getBounds();
     pdf.setFontSize(9);
     pdf.text('NW: ' + b.getNorth().toFixed(6) + ', ' + b.getWest().toFixed(6), mapAreaMM.x, mapAreaMM.y - 2);
     pdf.text('NE: ' + b.getNorth().toFixed(6) + ', ' + b.getEast().toFixed(6), mapAreaMM.x + drawW, mapAreaMM.y - 2, { align: 'right' });
@@ -609,7 +551,7 @@ async function exportMapToA3PDF() {
 
     // footer
     pdf.setFontSize(9);
-    const now = new Date();
+    var now = new Date();
     pdf.text('Dicetak: ' + now.toLocaleString(), marginMM, pdfHeightMM - marginMM + 2);
     pdf.text('Template: ' + templatePdfUrl, pdfWidthMM - marginMM, pdfHeightMM - marginMM + 2, { align: 'right' });
 
@@ -618,7 +560,6 @@ async function exportMapToA3PDF() {
   });
 }
 
-// tombol pemicu
 document.getElementById('btnPrintA3').addEventListener('click', function () {
   exportMapToA3PDF();
 });
