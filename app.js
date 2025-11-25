@@ -19,24 +19,53 @@ var lastSelectedId = null;
 // --- Helpers: create group from GeoJSON, adding each sublayer to a LayerGroup ---
 function createGroupFromGeoJSON(geojson, styleMeta){
   styleMeta = styleMeta || {};
+
+  // HARUS FeatureGroup supaya ada getBounds()
   var group = L.featureGroup();
+
+  // Buat GeoJSON layer sementara
   var base = L.geoJSON(geojson, {
-    style: function(f){ return { color: styleMeta.color || '#0077ff', weight: styleMeta.weight || 3, dashArray: styleMeta.dashArray || null, fillColor: styleMeta.fillColor || (styleMeta.color || '#0077ff'), fillOpacity: styleMeta.fillOpacity || 0.4 }; },
+    style: function(f){
+      return {
+        color: styleMeta.color || '#0077ff',
+        weight: styleMeta.weight || 3,
+        dashArray: styleMeta.dashArray || null,
+        fillColor: styleMeta.fillColor || (styleMeta.color || '#0077ff'),
+        fillOpacity: styleMeta.fillOpacity || 0.4
+      };
+    },
     pointToLayer: function(f,latlng){
-      // create marker based on symbol
       var symbol = styleMeta.markerSymbol || 'circle';
-      // simple marker variants using CircleMarker or DivIcon
+
       if(symbol === 'circle'){
-        return L.circleMarker(latlng, { radius:5, color: styleMeta.color || '#0077ff', fillColor: styleMeta.fillColor || (styleMeta.color||'#0077ff'), fillOpacity: styleMeta.fillOpacity || 0.8 });
+        return L.circleMarker(latlng,{
+          radius:5,
+          color: styleMeta.color || '#0077ff',
+          fillColor: styleMeta.fillColor || (styleMeta.color||'#0077ff'),
+          fillOpacity: styleMeta.fillOpacity || 0.8
+        });
       } else {
-        // use DivIcon for other shapes
-        var html = '<div style="width:12px;height:12px;border-radius:2px;background:' + (styleMeta.color || '#0077ff') + ';"></div>';
-        return L.marker(latlng, { icon: L.divIcon({ className:'custom-marker', html:html, iconSize:[12,12], iconAnchor:[6,6] }) });
+        var html = '<div style="width:12px;height:12px;border-radius:2px;background:'+ 
+                    (styleMeta.color||'#0077ff') +'"></div>';
+
+        return L.marker(latlng,{
+          icon: L.divIcon({
+            className:'custom-marker',
+            html:html,
+            iconSize:[12,12],
+            iconAnchor:[6,6]
+          })
+        });
       }
     }
   });
-  base.eachLayer(function(l){ group.addLayer(l); });
-  return { group: group, base: base };
+
+  // PENTING: pindahkan SEMUA sublayer geojson ke FeatureGroup
+  base.eachLayer(function(layer){
+    group.addLayer(layer);
+  });
+
+  return group;
 }
 
 // --- Utility: simple GPX exporter for GeoJSON (points as wpt, lines/polygons as trk) ---
@@ -251,29 +280,63 @@ function exportAllFor(id){
 
 // --- Upload handler ---
 el('#btnUpload').onclick = function(){
-  var fi = el('#gpxFile'); if(!fi.files || fi.files.length===0) return alert('Pilih file GPX.');
+  var fi = el('#gpxFile');
+  if(!fi.files || fi.files.length===0) return alert('Pilih file GPX.');
+
   var file = fi.files[0];
   var reader = new FileReader();
+
   reader.onload = function(){
     var dom = new DOMParser().parseFromString(reader.result,'text/xml');
     var geojson = toGeoJSON.gpx(dom);
+
     var id = Date.now() + '-' + Math.floor(Math.random()*1000);
-    var metaDefaults = { color:'#0077ff', weight:3, fillColor:'#0077ff', fillOpacity:0.4, dashArray:null, markerSymbol:'circle' };
-    var created = createGroupFromGeoJSON(geojson, metaDefaults);
-    var group = created.group;
+
+    var metaDefaults = {
+      color:'#0077ff',
+      weight:3,
+      fillColor:'#0077ff',
+      fillOpacity:0.4,
+      dashArray:null,
+      markerSymbol:'circle'
+    };
+
+    // group hasil perbaikan
+    var group = createGroupFromGeoJSON(geojson, metaDefaults);
+
+    // SAFE: FeatureGroup PASTI punya getBounds()
     var bounds = group.getBounds();
 
-    // save meta
-    uploadedFiles[id] = { name: file.name, group: group, bounds: bounds, color: metaDefaults.color, weight: metaDefaults.weight, fillColor: metaDefaults.fillColor, fillOpacity: metaDefaults.fillOpacity, dashArray: metaDefaults.dashArray, markerSymbol: metaDefaults.markerSymbol };
-    // add to map & editableLayers
-    group.eachLayer(function(l){ map.addLayer(l); editableLayers.addLayer(l); });
-    // create UI card
-    addFileCard(id, { name: file.name, summary: (bounds && bounds.isValid ? 'Bounds available' : 'No bounds') });
-    // fit
+    uploadedFiles[id] = {
+      name: file.name,
+      group: group,
+      bounds: bounds,
+      color: metaDefaults.color,
+      weight: metaDefaults.weight,
+      fillColor: metaDefaults.fillColor,
+      fillOpacity: metaDefaults.fillOpacity,
+      dashArray: metaDefaults.dashArray,
+      markerSymbol: metaDefaults.markerSymbol
+    };
+
+    // tampilkan layer
+    group.eachLayer(function(l){
+      map.addLayer(l);
+      editableLayers.addLayer(l);
+    });
+
+    // buat card UI
+    addFileCard(id, {
+      name: file.name,
+      summary: (bounds && bounds.isValid() ? "Bounds available" : "No bounds")
+    });
+
+    // zoom
     if(bounds && bounds.isValid()) map.fitBounds(bounds);
-    // reset input
+
     fi.value = '';
   };
+
   reader.readAsText(file);
 };
 
