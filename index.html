@@ -1,48 +1,48 @@
 <!doctype html>
 <html lang="id">
 <head>
-    <meta charset="utf-8" />
-    <title>Mini ArcGIS – GPX Processor</title>
+  <meta charset="utf-8" />
+  <title>Mini ArcGIS – GPX Processor</title>
 
-    <link rel="stylesheet" href="leaflet.css">
-    <link rel="stylesheet" href="leaflet.draw.css">
-    <link rel="stylesheet" href="style.css">
+  <!-- Leaflet (CSS lalu JS) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <script src="leaflet.js"></script>
-    <script src="leaflet.draw.js"></script>
-    <script src="togeojson.js"></script>
-    <script src="turf.min.js"></script>
-    <script src="tokml.js"></script>
-    <script src="FileSaver.min.js"></script>
+  <!-- Leaflet.draw (CSS lalu JS) - versi kompatibel -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+  <!-- Library lain (pastikan urutan jika perlu) -->
+  <script src="https://unpkg.com/togeojson@0.16.0/togeojson.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+  <script src="https://unpkg.com/tokml@0.4.0/tokml.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-<div id="container">
-
-    <!-- Sidebar kiri -->
+  <div id="container">
     <div id="sidebar">
-        <h3>Mini ArcGIS</h3>
+      <h3>Mini ArcGIS</h3>
 
-        <label>Upload GPX:</label><br>
-        <input type="file" id="gpxFile" accept=".gpx"><br><br>
-        <button id="btnUpload">Tampilkan GPX</button>
-        <hr>
+      <label>Upload GPX:</label><br>
+      <input type="file" id="gpxFile" accept=".gpx"><br><br>
+      <button id="btnUpload">Tampilkan GPX</button>
+      <hr>
 
-        <h4>Pengolahan Peta</h4>
-        <button id="btnBuffer">Buffer 20m</button><br><br>
+      <h4>Pengolahan Peta</h4>
+      <button id="btnBuffer">Buffer 20m</button><br><br>
+      <button id="btnClear">Hapus Semua Layer</button>
+      <hr>
 
-        <button id="btnClear">Hapus Semua Layer</button>
-        <hr>
-
-        <h4>Export</h4>
-        <button id="btnDownloadKml">Download KML</button>
+      <h4>Export</h4>
+      <button id="btnDownloadKml">Download KML</button>
     </div>
 
-    <!-- Peta -->
     <div id="map"></div>
+  </div>
 
-</div>
-
-<script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
