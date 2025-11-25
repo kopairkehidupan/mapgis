@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <title>Mini ArcGIS – GPX Processor</title>
+
+    <link rel="stylesheet" href="libs/leaflet.css">
+    <link rel="stylesheet" href="libs/leaflet.draw.css">
+    <link rel="stylesheet" href="style.css">
+
+    <script src="libs/leaflet.js"></script>
+    <script src="libs/leaflet.draw.js"></script>
+    <script src="libs/togeojson.js"></script>
+    <script src="libs/turf.min.js"></script>
+    <script src="libs/tokml.js"></script>
+    <script src="libs/FileSaver.min.js"></script>
+</head>
+
+<body>
+<div id="container">
+
+    <!-- Sidebar kiri -->
+    <div id="sidebar">
+        <h3>Mini ArcGIS</h3>
+
+        <label>Upload GPX:</label><br>
+        <input type="file" id="gpxFile" accept=".gpx"><br><br>
+        <button id="btnUpload">Tampilkan GPX</button>
+        <hr>
+
+        <h4>Pengolahan Peta</h4>
+        <button id="btnBuffer">Buffer 20m</button><br><br>
+
+        <button id="btnClear">Hapus Semua Layer</button>
+        <hr>
+
+        <h4>Export</h4>
+        <button id="btnDownloadKml">Download KML</button>
+    </div>
+
+    <!-- Peta -->
+    <div id="map"></div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
