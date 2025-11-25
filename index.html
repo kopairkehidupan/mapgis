@@ -18,6 +18,15 @@
   <script src="https://unpkg.com/tokml@0.4.0/tokml.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
+  <!-- leaflet-image: convert leaflet map to canvas -->
+  <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
+  
+  <!-- jsPDF untuk membuat PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  
+  <!-- (opsional) canvg untuk render SVG ke canvas jika mau -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/canvg/3.0.7/umd.min.js"></script>
+
   <link rel="stylesheet" href="style.css">
 
   <style>
@@ -56,6 +65,8 @@
         <label>Upload GPX</label><br>
         <input type="file" id="gpxFile" accept=".gpx"><br><br>
         <button id="btnUpload" class="btn-small">Upload & Tampilkan</button>
+        <hr>
+        <button id="btnPrintA3" class="btn-small">Export PDF A3</button>
       </div>
 
       <hr>
