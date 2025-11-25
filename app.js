@@ -3,7 +3,10 @@
 // --- Initialization ---
 // Force canvas renderer at map level
 var map = L.map('map', { preferCanvas: true }).setView([0.5, 101.4], 12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22 }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 22,
+  crossOrigin: true
+}).addTo(map);
 
 // Editable group for Leaflet.draw (will contain canvas-rendered layers)
 var editableLayers = new L.FeatureGroup().addTo(map);
@@ -60,13 +63,17 @@ function createGroupFromGeoJSON(geojson, styleMeta) {
     if (geom.type === 'Point') {
       var c = geom.coordinates;
       var latlng = L.latLng(c[1], c[0]);
-      var cm = L.circleMarker(latlng, L.Util.extend({
-        radius: 5,
+      var cm = L.circleMarker(latlng, {
+        radius: 6,
+        color: styleMeta.color || '#0077ff',
+        fillColor: styleMeta.fillColor || (styleMeta.color || '#0077ff'),
+        fillOpacity: styleMeta.fillOpacity || 0.8,
+        weight: 1,
         renderer: L.canvas({ padding: 0.5 })
-      }, getStyle()));
+      });
       cm.feature = f;
       group.addLayer(cm);
-
+      return;
     } else if (geom.type === 'MultiPoint') {
       geom.coordinates.forEach(function (c) {
         var latlng = L.latLng(c[1], c[0]);
