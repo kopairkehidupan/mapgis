@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="utf-8" />
-  <title>Mini ArcGIS – GPX Processor</title>
+  <title>Mini ArcGIS – GPX Processor (advanced)</title>
 
   <!-- Leaflet 1.7.1 -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
@@ -21,48 +21,115 @@
   <link rel="stylesheet" href="style.css">
 
   <style>
-    #fileList { list-style:none; padding:0; margin:0; }
-    #fileList li {
-        display:flex; 
-        flex-direction:column;
-        padding:6px 4px;
-        border-bottom:1px solid #ddd;
-        gap:4px;
-    }
-    .file-header { display:flex; align-items:center; gap:6px; }
-    .file-header label { flex:1; cursor:pointer; }
-    .btn-row { display:flex; gap:6px; padding-left:22px; }
-    .btn-small {
-        font-size:11px; 
-        padding:4px 6px; 
-        border:1px solid #aaa; 
-        background:#fff; 
-        border-radius:4px; 
-        cursor:pointer;
-    }
-    .btn-small:hover { background:#f0f0f0; }
+    body,html{height:100%;margin:0;font-family:Arial,Helvetica,sans-serif}
+    #container{display:flex;height:100vh}
+    #sidebar{width:350px;border-right:1px solid #ddd;padding:12px;box-sizing:border-box;overflow:auto;background:#fafafa}
+    #map{flex:1}
+    h3{margin:6px 0}
+    input[type="file"]{width:100%}
+    #fileList{list-style:none;padding:0;margin:6px 0}
+    .file-card{border:1px solid #e0e0e0;padding:8px;margin-bottom:8px;background:#fff;border-radius:6px}
+    .file-header{display:flex;align-items:center;gap:8px}
+    .file-title{flex:1;font-weight:600;cursor:pointer}
+    .file-actions{display:flex;gap:6px}
+    .btn-small{font-size:12px;padding:4px 6px;border-radius:4px;border:1px solid #bbb;background:#fff;cursor:pointer}
+    .btn-small:hover{background:#f0f0f0}
+    .toggle-folder{font-size:12px;color:#444;cursor:pointer}
+    .folder-contents{margin-top:8px;padding-left:8px}
+    .props{margin-top:10px;padding:8px;border:1px dashed #ddd;background:#fff;border-radius:6px}
+    .props h4{margin:4px 0}
+    label.small{font-size:12px;color:#444}
+    .row{display:flex;gap:8px;align-items:center;margin:6px 0}
+    .row input[type="color"]{width:38px;height:28px;padding:0;border:0}
+    .row input[type="range"]{width:140px}
+    .muted{font-size:12px;color:#666}
+    .hidden{display:none}
+    .symbol-select{padding:4px;font-size:12px}
   </style>
-
 </head>
-
 <body>
   <div id="container">
     <div id="sidebar">
-      <h3>Mini ArcGIS</h3>
+      <h3>Mini ArcGIS — Advanced</h3>
 
-      <label>Upload GPX:</label><br>
-      <input type="file" id="gpxFile" accept=".gpx"><br><br>
-      <button id="btnUpload">Upload & Tampilkan</button>
+      <div>
+        <label>Upload GPX</label><br>
+        <input type="file" id="gpxFile" accept=".gpx"><br><br>
+        <button id="btnUpload" class="btn-small">Upload & Tampilkan</button>
+      </div>
+
       <hr>
 
-      <h4>File Terupload</h4>
+      <h4>Layer / File (Folder view)</h4>
+      <div style="font-size:13px;color:#555;margin-bottom:6px">Klik nama untuk rename — Centang untuk tampil/hilang</div>
       <ul id="fileList"></ul>
-      <hr>
 
-      <h4>Edit Geometri</h4>
-      <p style="font-size:12px;color:#666;margin:0;">
-        Gunakan toolbar gambar untuk edit/move polygon/polyline.
-      </p>
+      <div id="propertiesPanel" class="props hidden">
+        <h4>Properti Layer</h4>
+        <div id="propNameRow" class="row">
+          <label class="small">Nama:</label>
+          <input id="propName" type="text" style="flex:1;padding:6px" />
+          <button id="propSaveName" class="btn-small">Simpan</button>
+        </div>
+
+        <div id="propStats" class="muted"></div>
+
+        <hr>
+
+        <div><label class="small">Style Editor</label></div>
+        <div class="row">
+          <label class="small">Stroke:</label>
+          <input id="styleStrokeColor" type="color" />
+          <label class="small">Width:</label>
+          <input id="styleStrokeWidth" type="range" min="1" max="10" value="3" />
+          <span id="strokeWidthVal" class="muted">3</span>
+        </div>
+
+        <div class="row">
+          <label class="small">Fill:</label>
+          <input id="styleFillColor" type="color" />
+          <label class="small">Opacity:</label>
+          <input id="styleFillOpacity" type="range" min="0" max="1" step="0.1" value="0.4" />
+          <span id="fillOpacityVal" class="muted">0.4</span>
+        </div>
+
+        <div class="row">
+          <label class="small">Line:</label>
+          <select id="styleDash" class="symbol-select">
+            <option value="">Solid</option>
+            <option value="4,4">Dash</option>
+            <option value="8,4,2,4">DashDot</option>
+          </select>
+
+          <label class="small">Marker:</label>
+          <select id="styleMarker" class="symbol-select">
+            <option value="circle">Circle</option>
+            <option value="square">Square</option>
+            <option value="triangle">Triangle</option>
+            <option value="star">Star</option>
+            <option value="pin">Pin</option>
+          </select>
+        </div>
+
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button id="applyStyle" class="btn-small">Apply</button>
+          <button id="revertStyle" class="btn-small">Reset</button>
+        </div>
+
+        <hr>
+
+        <div style="display:flex;gap:8px">
+          <button id="exportGeojson" class="btn-small">Export GeoJSON</button>
+          <button id="exportGpx" class="btn-small">Export GPX</button>
+          <button id="exportKml" class="btn-small">Export KML</button>
+          <button id="deleteLayer" class="btn-small" style="background:#fff1f1;border-color:#e88">Hapus Layer</button>
+        </div>
+
+      </div>
+
+      <hr>
+      <div class="muted" style="font-size:12px">Gunakan toolbar di peta untuk mengedit geometri. Rename & style langsung tersimpan ke metadata.</div>
+
     </div>
 
     <div id="map"></div>
