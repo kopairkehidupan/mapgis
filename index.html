@@ -19,6 +19,15 @@
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* tambahan: tampilkan list file di sidebar */
+    #fileList { list-style: none; padding: 0; margin: 0; }
+    #fileList li { display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid #eee; }
+    #fileList li label { flex:1; cursor:pointer; }
+    .btn-small { font-size:12px; padding:4px 6px; border:1px solid #bbb; background:#fff; border-radius:4px; cursor:pointer; }
+    .btn-small:hover { background:#f0f0f0; }
+    .meta { font-size:12px; color:#666; }
+  </style>
 </head>
 
 <body>
@@ -29,6 +38,10 @@
       <label>Upload GPX:</label><br>
       <input type="file" id="gpxFile" accept=".gpx"><br><br>
       <button id="btnUpload">Tampilkan GPX</button>
+      <hr>
+
+      <h4>File Terupload</h4>
+      <ul id="fileList"></ul>
       <hr>
 
       <h4>Pengolahan Peta</h4>
