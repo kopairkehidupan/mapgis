@@ -505,30 +505,28 @@ async function exportMapToA3PDF() {
 
     // --- 6) Scale bar (perkiraan) ditempatkan kiri bawah map ---
     // we hitung meters per pixel di center
-    // --- 6) Scale bar (perkiraan) di kiri bawah map ---
     const center = map.getCenter();
     const zoom = map.getZoom();
     const mPerPx = metersPerPixelAtLat(center.lat, zoom);
-    
-    // target panjang scale bar 40 mm
-    const targetMm = 40;
-    
-    // meters-per-mm (asumsi PDF mm = display mm)
-    const metersPerMmOnImage = mPerPx * (tmp.width / drawW);
-    
-    // Berapa meter untuk bar 40mm?
-    const scaleMeters = Math.round(metersPerMmOnImage * targetMm);
-    
-    // gambar scale bar
+    // in canvas pixel units (tmp.width) corresponds to drawW mm. Convert mm -> px (approx 3.78 px per mm at 96dpi)
+    // simpler: tentukan scaleBar length in mm (target)
+    const targetMm = 40; // ~40 mm scale bar
+    // convert mm to meters using map scale:
+    // tmp.width px => drawW mm  => metersOnMap = tmp.width * mPerPx
+    const metersOnImage = tmp.width * mPerPx;
+    const metersPerMmOnImage = metersOnImage / drawW; // meters per mm
+    const scaleMeters = Math.round(metersPerMmOnImage * targetMm / 10) * 10; // round to nearest 10m
+    // draw scale bar
     const scaleX = mapAreaMM.x + 12;
     const scaleY = mapAreaMM.y + drawH - 12;
-    
     pdf.setFontSize(10);
-    pdf.text('Scale ≈ 1:' + Math.round(metersPerMmOnImage), scaleX, scaleY - 4);
-    
+    // jsPDF memakai unit mm → 1 mm di PDF = 1 mm nyata (kita anggap 1:1)
+    // Skala peta = (meter di dunia pada 1 mm) : (1 mm)
+    const scaleApprox = Math.round(metersPerMmOnImage); 
+    pdf.text('Scale ≈ 1:' + scaleApprox, scaleX, scaleY - 6);
+    // scale bar rectangle (convert targetMm to pdf units)
     pdf.setFillColor(0);
     pdf.rect(scaleX, scaleY, targetMm, 3, 'F');
-    
     pdf.setFontSize(9);
     pdf.text(scaleMeters + ' m', scaleX + targetMm + 4, scaleY + 3);
 
