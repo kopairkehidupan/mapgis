@@ -3,9 +3,9 @@
 // --- Initialization ---
 // Force canvas renderer at map level and enable CORS on tile layer
 var map = L.map('map', { preferCanvas: true }).setView([0.5, 101.4], 12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
   maxZoom: 22,
-  crossOrigin: true
+  crossOrigin: 'anonymous'
 }).addTo(map);
 
 // Editable group for Leaflet.draw (will contain canvas-rendered layers)
