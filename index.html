@@ -120,6 +120,39 @@
           <button id="revertStyle" class="btn-small">Reset</button>
         </div>
 
+        <!-- Tambahkan ini di index.html setelah baris tombol Reset, sebelum <hr> export buttons -->
+        <hr>
+        
+        <div><label class="small">Label Editor</label></div>
+        <div class="row">
+          <label class="small">Tampilkan Label:</label>
+          <input id="labelShow" type="checkbox" checked />
+        </div>
+        
+        <div class="row">
+          <label class="small">Nama Blok:</label>
+          <input id="labelBlockName" type="text" style="flex:1;padding:4px" placeholder="Auto dari layer" />
+        </div>
+        
+        <div class="row">
+          <label class="small">Warna Teks:</label>
+          <input id="labelTextColor" type="color" value="#000000" />
+          <label class="small">Ukuran:</label>
+          <input id="labelTextSize" type="range" min="8" max="24" value="12" />
+          <span id="labelSizeVal" class="muted">12</span>
+        </div>
+        
+        <div class="row">
+          <label class="small">Rotasi (°):</label>
+          <input id="labelRotation" type="range" min="0" max="360" value="0" />
+          <span id="labelRotationVal" class="muted">0</span>
+        </div>
+        
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button id="applyLabel" class="btn-small">Apply Label</button>
+          <button id="revertLabel" class="btn-small">Reset Label</button>
+        </div>
+
         <hr>
 
         <div style="display:flex;gap:8px">
