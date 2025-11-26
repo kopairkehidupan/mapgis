@@ -422,14 +422,20 @@ async function exportPdfFromLayers() {
         // ---- POLYGON ----
         if (type === "Polygon") {
             f.geometry.coordinates.forEach(ring => {
-                const pts = ring.map(c => {
+                let path = "";
+    
+                ring.forEach((c, idx) => {
                     const [x, y] = project(c);
-                    return { x, y };
+                    path += (idx === 0)
+                        ? `M ${x} ${y} `
+                        : `L ${x} ${y} `;
                 });
     
-                page.drawPolygon(pts, {
-                    color: rgb(0.6, 0.8, 1),            // fill
-                    borderColor: rgb(0.1, 0.3, 0.8),   // stroke
+                path += "Z"; // tutup polygon
+    
+                page.drawSvgPath(path, {
+                    color: rgb(0.6, 0.8, 1),
+                    borderColor: rgb(0.1, 0.3, 0.8),
                     borderWidth: 1
                 });
             });
@@ -437,19 +443,19 @@ async function exportPdfFromLayers() {
     
         // ---- LINESTRING ----
         else if (type === "LineString") {
-            const pts = f.geometry.coordinates.map(c => {
+            let path = "";
+    
+            f.geometry.coordinates.forEach((c, idx) => {
                 const [x, y] = project(c);
-                return { x, y };
+                path += (idx === 0)
+                    ? `M ${x} ${y} `
+                    : `L ${x} ${y} `;
             });
     
-            for (let i = 0; i < pts.length - 1; i++) {
-                page.drawLine({
-                    start: pts[i],
-                    end: pts[i + 1],
-                    thickness: 2,
-                    color: rgb(1, 0, 0)
-                });
-            }
+            page.drawSvgPath(path, {
+                borderColor: rgb(1, 0, 0),
+                borderWidth: 2
+            });
         }
     });
 
