@@ -412,7 +412,8 @@ async function exportPdfFromLayers() {
         const centerX = mapOffsetX + mapWidth / 2;
         const centerY = mapOffsetY + mapHeight / 2;
         const x = centerX + (lng - (minX + maxX) / 2) * scale;
-        const y = centerY - (lat - (minY + maxY) / 2) * scale;
+        // PERBAIKAN: Balik arah Y agar sesuai dengan peta geografis (utara di atas)
+        const y = centerY + (lat - (minY + maxY) / 2) * scale;
         return [x, y];
     }
 
