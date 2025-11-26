@@ -504,7 +504,10 @@ async function exportPdfFromLayers() {
                 const area = turf.area(f);
                 totalArea += area;
 
-                f.geometry.coordinates.forEach(ring => {
+                f.geometry.coordinates.forEach((ring, ringIdx) => {
+                    // Hanya proses outer ring (index 0)
+                    if (ringIdx !== 0) return;
+                    
                     // Gambar fill dengan semi-transparansi
                     // Metode: gambar banyak garis horizontal untuk simulasi fill
                     const allY = ring.map(c => project(c)[1]);
@@ -563,6 +566,49 @@ async function exportPdfFromLayers() {
                         thickness: lineWidth,
                         color: strokeColor,
                         opacity: 1
+                    });
+                    
+                    // ===== LABEL DI DALAM POLYGON =====
+                    // Hitung centroid menggunakan Turf.js
+                    const centroid = turf.centroid(f);
+                    const [centX, centY] = project(centroid.geometry.coordinates);
+                    
+                    // Area dalam hektar
+                    const areaHa = (area / 10000).toFixed(2);
+                    
+                    // Label nama (dari properties atau nama layer)
+                    const labelName = (f.properties && f.properties.name) || meta.name.replace('.gpx', '');
+                    
+                    // Background kotak putih untuk label (agar mudah dibaca)
+                    const labelText = areaHa + " Ha";
+                    const textWidth = labelText.length * 4; // estimasi lebar
+                    const textHeight = 20;
+                    
+                    page.drawRectangle({
+                        x: centX - textWidth/2 - 3,
+                        y: centY - 5,
+                        width: textWidth + 6,
+                        height: textHeight,
+                        color: rgb(1, 1, 1),
+                        opacity: 0.8
+                    });
+                    
+                    // Gambar border kotak
+                    page.drawRectangle({
+                        x: centX - textWidth/2 - 3,
+                        y: centY - 5,
+                        width: textWidth + 6,
+                        height: textHeight,
+                        borderColor: rgb(0, 0, 0),
+                        borderWidth: 0.5
+                    });
+                    
+                    // Teks label
+                    page.drawText(labelText, {
+                        x: centX - textWidth/2,
+                        y: centY,
+                        size: 8,
+                        color: rgb(0, 0, 0)
                     });
                 });
             }
