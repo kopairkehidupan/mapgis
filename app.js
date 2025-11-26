@@ -387,7 +387,7 @@ async function exportPdfFromLayers() {
     const { PDFDocument, rgb } = PDFLib;
 
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([1400, 900]);
+    const page = pdfDoc.addPage([842, 595]); // A4 landscape
 
     const gj = editableLayers.toGeoJSON();
     if (!gj || !gj.features || gj.features.length === 0) {
@@ -399,29 +399,98 @@ async function exportPdfFromLayers() {
     const bbox = turf.bbox(gj);
     const [minX, minY, maxX, maxY] = bbox;
 
-    const width = 1100; 
-    const height = 700;
-    const offsetX = 150;
-    const offsetY = 100;
+    // Area peta
+    const mapWidth = 500;
+    const mapHeight = 450;
+    const mapOffsetX = 50;
+    const mapOffsetY = 80;
 
     function project([lng, lat]) {
         const dx = maxX - minX;
         const dy = maxY - minY;
-        const scale = Math.min(width / dx, height / dy);
-        const x = offsetX + (lng - minX) * scale;
-        const y = offsetY + (maxY - lat) * scale;
+        const scale = Math.min(mapWidth / dx, mapHeight / dy) * 0.9; // 0.9 untuk padding
+        const centerX = mapOffsetX + mapWidth / 2;
+        const centerY = mapOffsetY + mapHeight / 2;
+        const x = centerX + (lng - (minX + maxX) / 2) * scale;
+        const y = centerY - (lat - (minY + maxY) / 2) * scale;
         return [x, y];
     }
 
-    // --------- Gambar Semua Polygon & Polyline ---------
+    // --------- Border Peta ---------
+    page.drawRectangle({
+        x: mapOffsetX,
+        y: mapOffsetY,
+        width: mapWidth,
+        height: mapHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 2
+    });
+
+    // --------- Grid Koordinat ---------
+    const gridColor = rgb(0.7, 0.7, 0.7);
+    const numGridLines = 4;
+    
+    // Vertical grid lines
+    for (let i = 0; i <= numGridLines; i++) {
+        const lng = minX + (maxX - minX) * (i / numGridLines);
+        const [x, y1] = project([lng, minY]);
+        const [, y2] = project([lng, maxY]);
+        
+        page.drawLine({
+            start: { x, y: y1 },
+            end: { x, y: y2 },
+            thickness: 0.5,
+            color: gridColor,
+            dashArray: [3, 3]
+        });
+        
+        // Label koordinat
+        const lngLabel = lng.toFixed(4) + "°E";
+        page.drawText(lngLabel, { x: x - 20, y: mapOffsetY - 15, size: 8, color: rgb(0, 0, 0) });
+    }
+    
+    // Horizontal grid lines
+    for (let i = 0; i <= numGridLines; i++) {
+        const lat = minY + (maxY - minY) * (i / numGridLines);
+        const [x1, y] = project([minX, lat]);
+        const [x2] = project([maxX, lat]);
+        
+        page.drawLine({
+            start: { x: x1, y },
+            end: { x: x2, y },
+            thickness: 0.5,
+            color: gridColor,
+            dashArray: [3, 3]
+        });
+        
+        // Label koordinat
+        const latLabel = lat.toFixed(4) + "°N";
+        page.drawText(latLabel, { x: mapOffsetX - 45, y: y - 3, size: 8, color: rgb(0, 0, 0) });
+    }
+
+    // --------- Gambar Polygon & Polyline ---------
+    let totalArea = 0;
+    const colors = [
+        rgb(0.2, 0.6, 0.2),  // hijau
+        rgb(0.8, 0.6, 0.2),  // kuning
+        rgb(0.4, 0.5, 0.8),  // biru
+        rgb(0.7, 0.3, 0.5)   // ungu
+    ];
+    let colorIndex = 0;
+
     gj.features.forEach(f => {
         if (!f.geometry) return;
         const type = f.geometry.type;
+        const layerColor = colors[colorIndex % colors.length];
+        colorIndex++;
     
         // ---- POLYGON ----
         if (type === "Polygon") {
+            // Hitung luas
+            const area = turf.area(f);
+            totalArea += area;
+
             f.geometry.coordinates.forEach(ring => {
-                // Gambar fill polygon dengan rectangle kecil-kecil (workaround)
                 for(let i = 0; i < ring.length - 1; i++){
                     const [x1, y1] = project(ring[i]);
                     const [x2, y2] = project(ring[i + 1]);
@@ -430,20 +499,19 @@ async function exportPdfFromLayers() {
                         start: { x: x1, y: y1 },
                         end: { x: x2, y: y2 },
                         thickness: 2,
-                        color: rgb(0, 0.5, 1),
-                        opacity: 0.8
+                        color: layerColor,
+                        opacity: 0.9
                     });
                 }
                 
-                // Tutup polygon
                 const [xFirst, yFirst] = project(ring[0]);
                 const [xLast, yLast] = project(ring[ring.length - 1]);
                 page.drawLine({
                     start: { x: xLast, y: yLast },
                     end: { x: xFirst, y: yFirst },
                     thickness: 2,
-                    color: rgb(0, 0.5, 1),
-                    opacity: 0.8
+                    color: layerColor,
+                    opacity: 0.9
                 });
             });
         }
@@ -457,29 +525,162 @@ async function exportPdfFromLayers() {
                 page.drawLine({
                     start: { x: x1, y: y1 },
                     end: { x: x2, y: y2 },
-                    thickness: 2,
-                    color: rgb(1, 0, 0),
+                    thickness: 1.5,
+                    color: rgb(0.8, 0.2, 0.2),
                     opacity: 1
                 });
             }
         }
     });
 
-    // --------- Judul + Legenda ----------
-    page.drawText("PETA AREAL HASIL OLAHAN", { x: 550, y: 850, size: 24, color: rgb(0, 0, 0) });
+    // --------- HEADER ---------
+    page.drawText("PETA AREAL KEBUN", { 
+        x: 300, y: 560, size: 20, color: rgb(0, 0, 0) 
+    });
+    
+    // Subtitle (bisa diganti sesuai kebutuhan)
+    page.drawText("HASIL PENGOLAHAN GPX", { 
+        x: 320, y: 540, size: 12, color: rgb(0.3, 0.3, 0.3) 
+    });
 
-    page.drawText("Legenda:", { x: 50, y: 800, size: 14, color: rgb(0, 0, 0) });
+    // --------- KOMPAS (Arah Utara) ---------
+    const compassX = 520;
+    const compassY = 500;
     
-    // Kotak legenda polygon
-    page.drawRectangle({ x: 50, y: 770, width: 20, height: 10, color: rgb(0, 0.5, 1), opacity: 0.8 });
-    page.drawText("Polygon Kebun", { x: 80, y: 770, size: 12, color: rgb(0, 0, 0) });
+    // Lingkaran kompas
+    page.drawCircle({
+        x: compassX,
+        y: compassY,
+        size: 15,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1.5
+    });
     
-    // Garis legenda linestring
-    page.drawLine({ start: {x: 50, y: 750}, end: {x: 70, y: 750}, thickness: 2, color: rgb(1, 0, 0) });
-    page.drawText("Jalan/Garis", { x: 80, y: 745, size: 12, color: rgb(0, 0, 0) });
+    // Panah utara
+    page.drawLine({
+        start: { x: compassX, y: compassY },
+        end: { x: compassX, y: compassY + 12 },
+        thickness: 2,
+        color: rgb(0, 0, 0)
+    });
+    
+    // Ujung panah
+    page.drawLine({
+        start: { x: compassX, y: compassY + 12 },
+        end: { x: compassX - 3, y: compassY + 8 },
+        thickness: 2,
+        color: rgb(0, 0, 0)
+    });
+    page.drawLine({
+        start: { x: compassX, y: compassY + 12 },
+        end: { x: compassX + 3, y: compassY + 8 },
+        thickness: 2,
+        color: rgb(0, 0, 0)
+    });
+    
+    page.drawText("U", { x: compassX - 3, y: compassY + 17, size: 10, color: rgb(0, 0, 0) });
+
+    // --------- SKALA ---------
+    const scaleX = 580;
+    const scaleY = 120;
+    const scaleLength = 50;
+    
+    // Hitung skala sebenarnya (approx)
+    const realDist = turf.distance([minX, minY], [maxX, minY], {units: 'meters'});
+    const pixelDist = mapWidth;
+    const scaleRatio = Math.round((realDist / pixelDist) * scaleLength);
+    
+    page.drawLine({
+        start: { x: scaleX, y: scaleY },
+        end: { x: scaleX + scaleLength, y: scaleY },
+        thickness: 2,
+        color: rgb(0, 0, 0)
+    });
+    page.drawLine({
+        start: { x: scaleX, y: scaleY - 5 },
+        end: { x: scaleX, y: scaleY + 5 },
+        thickness: 2,
+        color: rgb(0, 0, 0)
+    });
+    page.drawLine({
+        start: { x: scaleX + scaleLength, y: scaleY - 5 },
+        end: { x: scaleX + scaleLength, y: scaleY + 5 },
+        thickness: 2,
+        color: rgb(0, 0, 0)
+    });
+    
+    page.drawText("0", { x: scaleX - 5, y: scaleY - 15, size: 8, color: rgb(0, 0, 0) });
+    page.drawText(scaleRatio + " m", { x: scaleX + scaleLength - 15, y: scaleY - 15, size: 8, color: rgb(0, 0, 0) });
+    page.drawText("SKALA", { x: scaleX + 10, y: scaleY + 10, size: 9, color: rgb(0, 0, 0) });
+
+    // --------- LEGENDA ---------
+    const legendX = 580;
+    let legendY = 450;
+    
+    page.drawText("KETERANGAN:", { x: legendX, y: legendY, size: 12, color: rgb(0, 0, 0) });
+    legendY -= 20;
+    
+    // Polygon layers
+    let layerIdx = 0;
+    Object.keys(uploadedFiles).forEach(id => {
+        const meta = uploadedFiles[id];
+        const layerColor = colors[layerIdx % colors.length];
+        
+        // Box warna
+        page.drawRectangle({
+            x: legendX,
+            y: legendY - 8,
+            width: 15,
+            height: 8,
+            color: layerColor,
+            borderColor: rgb(0, 0, 0),
+            borderWidth: 0.5
+        });
+        
+        // Nama layer + luas
+        const gj = meta.group.toGeoJSON();
+        let layerArea = 0;
+        gj.features.forEach(f => {
+            if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
+                layerArea += turf.area(f);
+            }
+        });
+        
+        const areaHa = (layerArea / 10000).toFixed(2);
+        page.drawText(meta.name + " - " + areaHa + " Ha", { 
+            x: legendX + 20, y: legendY - 7, size: 9, color: rgb(0, 0, 0) 
+        });
+        
+        legendY -= 15;
+        layerIdx++;
+    });
+    
+    // Garis jalan
+    page.drawLine({
+        start: { x: legendX, y: legendY - 4 },
+        end: { x: legendX + 15, y: legendY - 4 },
+        thickness: 2,
+        color: rgb(0.8, 0.2, 0.2)
+    });
+    page.drawText("Jalan / Garis", { x: legendX + 20, y: legendY - 7, size: 9, color: rgb(0, 0, 0) });
+    
+    legendY -= 25;
+    
+    // Total luas
+    const totalHa = (totalArea / 10000).toFixed(2);
+    page.drawText("Total Luas: " + totalHa + " Ha", { 
+        x: legendX, y: legendY, size: 11, color: rgb(0, 0, 0) 
+    });
+
+    // --------- FOOTER ---------
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('id-ID');
+    page.drawText("Dicetak: " + dateStr, { 
+        x: 50, y: 20, size: 8, color: rgb(0.4, 0.4, 0.4) 
+    });
 
     const pdfBytes = await pdfDoc.save();
-    saveAs(new Blob([pdfBytes]), "peta.pdf");
+    saveAs(new Blob([pdfBytes]), "peta_areal.pdf");
 }
 
 // End of app.js
