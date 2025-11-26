@@ -216,7 +216,139 @@ function openProperties(id){
   el('#styleMarker').value = meta.markerSymbol || 'circle';
 }
 
+// Tambahkan setelah fungsi openProperties (sekitar baris 230)
+
+// Fungsi untuk membuat/update label di peta
+function updateMapLabels(id) {
+  var meta = uploadedFiles[id];
+  if (!meta || !meta.labelSettings.show) {
+    // Hapus label jika ada
+    if (labelLayers[id]) {
+      labelLayers[id].forEach(function(layer) {
+        map.removeLayer(layer);
+      });
+      labelLayers[id] = [];
+    }
+    return;
+  }
+
+  // Hapus label lama
+  if (labelLayers[id]) {
+    labelLayers[id].forEach(function(layer) {
+      map.removeLayer(layer);
+    });
+  }
+  labelLayers[id] = [];
+
+  var gj = meta.group.toGeoJSON();
+  gj.features.forEach(function(f) {
+    if (!f.geometry || f.geometry.type !== 'Polygon') return;
+    
+    var centroid = turf.centroid(f);
+    var area = turf.area(f);
+    var areaHa = (area / 10000).toFixed(2);
+    
+    var labelHtml = '<div style="' +
+      'background:rgba(255,255,255,0.8);' +
+      'padding:4px 8px;' +
+      'border:1px solid #000;' +
+      'border-radius:4px;' +
+      'text-align:center;' +
+      'white-space:nowrap;' +
+      'font-weight:600;' +
+      'color:' + meta.labelSettings.textColor + ';' +
+      'font-size:' + meta.labelSettings.textSize + 'px;' +
+      'transform:rotate(' + meta.labelSettings.rotation + 'deg);' +
+      'pointer-events:none;' +
+      '">' +
+      meta.labelSettings.blockName + '<br>' +
+      areaHa + ' Ha' +
+      '</div>';
+    
+    var labelMarker = L.marker(
+      [centroid.geometry.coordinates[1], centroid.geometry.coordinates[0]],
+      {
+        icon: L.divIcon({
+          className: 'label-marker',
+          html: labelHtml,
+          iconSize: null,
+          iconAnchor: [0, 0]
+        })
+      }
+    );
+    
+    labelMarker.addTo(map);
+    labelLayers[id].push(labelMarker);
+  });
+}
+
 function closeProperties(){ lastSelectedId = null; el('#propertiesPanel').classList.add('hidden'); }
+
+// Tambahkan setelah fungsi closeProperties() (sekitar baris 240)
+
+// Fungsi untuk membuat/update label di peta
+function updateMapLabels(id) {
+  var meta = uploadedFiles[id];
+  if (!meta || !meta.labelSettings.show) {
+    // Hapus label jika ada
+    if (labelLayers[id]) {
+      labelLayers[id].forEach(function(layer) {
+        map.removeLayer(layer);
+      });
+      labelLayers[id] = [];
+    }
+    return;
+  }
+
+  // Hapus label lama
+  if (labelLayers[id]) {
+    labelLayers[id].forEach(function(layer) {
+      map.removeLayer(layer);
+    });
+  }
+  labelLayers[id] = [];
+
+  var gj = meta.group.toGeoJSON();
+  gj.features.forEach(function(f) {
+    if (!f.geometry || f.geometry.type !== 'Polygon') return;
+    
+    var centroid = turf.centroid(f);
+    var area = turf.area(f);
+    var areaHa = (area / 10000).toFixed(2);
+    
+    var labelHtml = '<div style="' +
+      'background:rgba(255,255,255,0.8);' +
+      'padding:4px 8px;' +
+      'border:1px solid #000;' +
+      'border-radius:4px;' +
+      'text-align:center;' +
+      'white-space:nowrap;' +
+      'font-weight:600;' +
+      'color:' + meta.labelSettings.textColor + ';' +
+      'font-size:' + meta.labelSettings.textSize + 'px;' +
+      'transform:rotate(' + meta.labelSettings.rotation + 'deg);' +
+      'pointer-events:none;' +
+      '">' +
+      meta.labelSettings.blockName + '<br>' +
+      areaHa + ' Ha' +
+      '</div>';
+    
+    var labelMarker = L.marker(
+      [centroid.geometry.coordinates[1], centroid.geometry.coordinates[0]],
+      {
+        icon: L.divIcon({
+          className: 'label-marker',
+          html: labelHtml,
+          iconSize: null,
+          iconAnchor: [0, 0]
+        })
+      }
+    );
+    
+    labelMarker.addTo(map);
+    labelLayers[id].push(labelMarker);
+  });
+}
 
 // hook save name
 el('#propSaveName').onclick = function(){
@@ -232,6 +364,44 @@ el('#propSaveName').onclick = function(){
 // style controls live display
 el('#styleStrokeWidth').oninput = function(){ el('#strokeWidthVal').innerText = this.value; };
 el('#styleFillOpacity').oninput = function(){ el('#fillOpacityVal').innerText = this.value; };
+
+// Tambahkan setelah baris el('#styleFillOpacity').oninput
+
+// Label controls live display
+el('#labelTextSize').oninput = function(){ el('#labelSizeVal').innerText = this.value; };
+el('#labelRotation').oninput = function(){ el('#labelRotationVal').innerText = this.value; };
+
+// Apply label settings
+el('#applyLabel').onclick = function(){
+  if(!lastSelectedId) return alert('Pilih layer dulu.');
+  var meta = uploadedFiles[lastSelectedId];
+  
+  meta.labelSettings = {
+    show: el('#labelShow').checked,
+    blockName: el('#labelBlockName').value.trim() || meta.name.replace('.gpx', ''),
+    textColor: el('#labelTextColor').value,
+    textSize: parseInt(el('#labelTextSize').value),
+    rotation: parseInt(el('#labelRotation').value)
+  };
+  
+  updateMapLabels(lastSelectedId);
+  alert('Label settings diterapkan.');
+};
+
+// Reset label settings
+el('#revertLabel').onclick = function(){
+  if(!lastSelectedId) return;
+  var meta = uploadedFiles[lastSelectedId];
+  meta.labelSettings = {
+    show: true,
+    blockName: meta.name.replace('.gpx', ''),
+    textColor: '#000000',
+    textSize: 12,
+    rotation: 0
+  };
+  openProperties(lastSelectedId);
+  updateMapLabels(lastSelectedId);
+};
 
 // apply style to lastSelectedId
 el('#applyStyle').onclick = function(){
