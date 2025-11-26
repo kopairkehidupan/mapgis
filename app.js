@@ -440,9 +440,12 @@ async function exportPdfFromLayers() {
                 path += "Z"; // tutup polygon
     
                 page.drawSvgPath(path, {
-                    color: rgb(0.6, 0.8, 1),
-                    borderColor: rgb(0.1, 0.3, 0.8),
-                    borderWidth: 1
+                    stroke: true,
+                    strokeColor: rgb(0.1, 0.3, 0.8),
+                    strokeWidth: 1,
+                
+                    fill: true,
+                    color: rgb(0.6, 0.8, 1)
                 });
             });
         }
@@ -459,8 +462,9 @@ async function exportPdfFromLayers() {
             });
     
             page.drawSvgPath(path, {
-                borderColor: rgb(1, 0, 0),
-                borderWidth: 2
+                stroke: true,
+                strokeColor: rgb(1, 0, 0),
+                strokeWidth: 2
             });
         }
     });
