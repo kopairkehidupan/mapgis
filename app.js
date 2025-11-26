@@ -15,6 +15,7 @@ map.on(L.Draw.Event.CREATED, function(e){ editableLayers.addLayer(e.layer); });
 // --- State ---
 var uploadedFiles = {}; // id -> { name, group:LayerGroup, bounds, color, weight, fillColor, fillOpacity, dashArray, markerSymbol }
 var lastSelectedId = null;
+var labelLayers = {}; // id -> array of label markers
 
 // --- Helpers: create group from GeoJSON, adding each sublayer to a LayerGroup ---
 function createGroupFromGeoJSON(geojson, styleMeta){
@@ -214,6 +215,18 @@ function openProperties(id){
   el('#fillOpacityVal').innerText = el('#styleFillOpacity').value;
   el('#styleDash').value = meta.dashArray || '';
   el('#styleMarker').value = meta.markerSymbol || 'circle';
+
+  // Load label settings
+  el('#labelShow').checked = meta.labelSettings.show;
+  el('#labelBlockName').value = meta.labelSettings.blockName;
+  el('#labelTextColor').value = meta.labelSettings.textColor;
+  el('#labelTextSize').value = meta.labelSettings.textSize;
+  el('#labelSizeVal').innerText = meta.labelSettings.textSize;
+  el('#labelRotation').value = meta.labelSettings.rotation;
+  el('#labelRotationVal').innerText = meta.labelSettings.rotation;
+  
+  // Update labels on map
+  updateMapLabels(id);
 }
 
 // Tambahkan setelah fungsi openProperties (sekitar baris 230)
@@ -477,7 +490,7 @@ el('#btnUpload').onclick = function(){
     var group = createGroupFromGeoJSON(geojson, metaDefaults);
     var bounds = group.getBounds();
 
-    uploadedFiles[id] = {
+   uploadedFiles[id] = {
       name: file.name,
       group: group,
       bounds: bounds,
@@ -486,7 +499,14 @@ el('#btnUpload').onclick = function(){
       fillColor: metaDefaults.fillColor,
       fillOpacity: metaDefaults.fillOpacity,
       dashArray: metaDefaults.dashArray,
-      markerSymbol: metaDefaults.markerSymbol
+      markerSymbol: metaDefaults.markerSymbol,
+      labelSettings: {
+        show: true,
+        blockName: file.name.replace('.gpx', ''),
+        textColor: '#000000',
+        textSize: 12,
+        rotation: 0
+      }
     };
 
     group.eachLayer(function(l){
@@ -738,21 +758,67 @@ async function exportPdfFromLayers() {
                         opacity: 1
                     });
                     
-                    // ===== LABEL DI DALAM POLYGON =====
-                    // Hitung centroid menggunakan Turf.js
-                    const centroid = turf.centroid(f);
-                    const [centX, centY] = project(centroid.geometry.coordinates);
-                    
-                    // Area dalam hektar
-                    const areaHa = (area / 10000).toFixed(2);
-                    
-                    // Label nama (dari properties atau nama layer)
-                    const labelName = (f.properties && f.properties.name) || meta.name.replace('.gpx', '');
-                    
-                    // Background kotak putih untuk label (agar mudah dibaca)
-                    const labelText = areaHa + " Ha";
-                    const textWidth = labelText.length * 4; // estimasi lebar
-                    const textHeight = 20;
+                    // ===== LABEL DI DALAM POLYGON (gunakan labelSettings) =====
+                    if (meta.labelSettings && meta.labelSettings.show) {
+                      const centroid = turf.centroid(f);
+                      const [centX, centY] = project(centroid.geometry.coordinates);
+                      
+                      const areaHa = (area / 10000).toFixed(2);
+                      
+                      // Gunakan label settings
+                      const blockName = meta.labelSettings.blockName || meta.name.replace('.gpx', '');
+                      const labelTextColor = hexToRgb(meta.labelSettings.textColor || '#000000');
+                      const labelSize = meta.labelSettings.textSize || 12;
+                      const labelRotation = meta.labelSettings.rotation || 0;
+                      
+                      // Text yang akan ditampilkan
+                      const line1 = blockName;
+                      const line2 = areaHa + " Ha";
+                      
+                      const textWidth = Math.max(line1.length, line2.length) * (labelSize * 0.5);
+                      const textHeight = labelSize * 2.5;
+                      
+                      // Save current state untuk rotasi
+                      const rad = (labelRotation * Math.PI) / 180;
+                      
+                      // Background kotak putih
+                      page.drawRectangle({
+                        x: centX - textWidth/2 - 3,
+                        y: centY - textHeight/2,
+                        width: textWidth + 6,
+                        height: textHeight,
+                        color: rgb(1, 1, 1),
+                        opacity: 0.8
+                      });
+                      
+                      // Border kotak
+                      page.drawRectangle({
+                        x: centX - textWidth/2 - 3,
+                        y: centY - textHeight/2,
+                        width: textWidth + 6,
+                        height: textHeight,
+                        borderColor: rgb(0, 0, 0),
+                        borderWidth: 0.5
+                      });
+                      
+                      // Teks nama blok (baris 1)
+                      page.drawText(line1, {
+                        x: centX - (line1.length * labelSize * 0.25),
+                        y: centY + labelSize * 0.3,
+                        size: labelSize,
+                        color: rgb(labelTextColor.r, labelTextColor.g, labelTextColor.b),
+                        rotate: { angle: rad, type: 'radians' }
+                      });
+                      
+                      // Teks luas (baris 2)
+                      page.drawText(line2, {
+                        x: centX - (line2.length * labelSize * 0.25),
+                        y: centY - labelSize * 0.7,
+                        size: labelSize,
+                        color: rgb(labelTextColor.r, labelTextColor.g, labelTextColor.b),
+                        rotate: { angle: rad, type: 'radians' }
+                      });
+                    }
                     
                     page.drawRectangle({
                         x: centX - textWidth/2 - 3,
