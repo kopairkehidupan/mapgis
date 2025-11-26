@@ -405,15 +405,16 @@ async function exportPdfFromLayers() {
     const offsetY = 100;
 
     function project([lng, lat]) {
-        const scaleX = width / (maxX - minX || 1);
-        const scaleY = height / (maxY - minY || 1);
+
+        const dx = maxX - minX;
+        const dy = maxY - minY;
     
-        const scale = Math.min(scaleX, scaleY); // supaya tidak keluar halaman
+        const scale = Math.min(width / dx, height / dy);
     
-        return [
-            offsetX + (lng - minX) * scale,
-            offsetY + (maxY - lat) * scale
-        ];
+        const x = offsetX + (lng - minX) * scale;
+        const y = offsetY + (maxY - lat) * scale;
+    
+        return [x, y];
     }
 
     const ctx = page.getContext ? page.getContext() : null;
