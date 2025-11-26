@@ -469,69 +469,120 @@ async function exportPdfFromLayers() {
         page.drawText(latLabel, { x: mapOffsetX - 45, y: y - 3, size: 8, color: rgb(0, 0, 0) });
     }
 
-    // --------- Gambar Polygon & Polyline ---------
+    // --------- Gambar Polygon & Polyline dengan style dari layer ---------
     let totalArea = 0;
-    const colors = [
-        rgb(0.2, 0.6, 0.2),  // hijau
-        rgb(0.8, 0.6, 0.2),  // kuning
-        rgb(0.4, 0.5, 0.8),  // biru
-        rgb(0.7, 0.3, 0.5)   // ungu
-    ];
-    let colorIndex = 0;
-
-    gj.features.forEach(f => {
-        if (!f.geometry) return;
-        const type = f.geometry.type;
-        const layerColor = colors[colorIndex % colors.length];
-        colorIndex++;
     
-        // ---- POLYGON ----
-        if (type === "Polygon") {
-            // Hitung luas
-            const area = turf.area(f);
-            totalArea += area;
+    // Helper: konversi hex color ke RGB
+    function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16) / 255,
+            g: parseInt(result[2], 16) / 255,
+            b: parseInt(result[3], 16) / 255
+        } : { r: 0, g: 0.5, b: 1 };
+    }
 
-            f.geometry.coordinates.forEach(ring => {
-                for(let i = 0; i < ring.length - 1; i++){
-                    const [x1, y1] = project(ring[i]);
-                    const [x2, y2] = project(ring[i + 1]);
+    // Gambar berdasarkan file yang diupload (dengan style masing-masing)
+    Object.keys(uploadedFiles).forEach(id => {
+        const meta = uploadedFiles[id];
+        const layerGj = meta.group.toGeoJSON();
+        
+        // Konversi warna dari hex ke rgb
+        const strokeRgb = hexToRgb(meta.color || '#0077ff');
+        const fillRgb = hexToRgb(meta.fillColor || meta.color || '#0077ff');
+        const strokeColor = rgb(strokeRgb.r, strokeRgb.g, strokeRgb.b);
+        const fillColor = rgb(fillRgb.r, fillRgb.g, fillRgb.b);
+        const lineWidth = meta.weight || 3;
+        const fillOpacity = (typeof meta.fillOpacity !== 'undefined') ? meta.fillOpacity : 0.4;
+        
+        layerGj.features.forEach(f => {
+            if (!f.geometry) return;
+            const type = f.geometry.type;
+        
+            // ---- POLYGON ----
+            if (type === "Polygon") {
+                const area = turf.area(f);
+                totalArea += area;
+
+                f.geometry.coordinates.forEach(ring => {
+                    // Gambar fill dengan semi-transparansi
+                    // Metode: gambar banyak garis horizontal untuk simulasi fill
+                    const allY = ring.map(c => project(c)[1]);
+                    const minYPoly = Math.min(...allY);
+                    const maxYPoly = Math.max(...allY);
+                    
+                    // Fill dengan garis horizontal rapat
+                    for(let fillY = minYPoly; fillY <= maxYPoly; fillY += 1) {
+                        const intersections = [];
+                        for(let i = 0; i < ring.length - 1; i++){
+                            const [x1, y1] = project(ring[i]);
+                            const [x2, y2] = project(ring[i + 1]);
+                            
+                            if((y1 <= fillY && fillY <= y2) || (y2 <= fillY && fillY <= y1)) {
+                                if(y2 !== y1) {
+                                    const t = (fillY - y1) / (y2 - y1);
+                                    const xInt = x1 + t * (x2 - x1);
+                                    intersections.push(xInt);
+                                }
+                            }
+                        }
+                        
+                        intersections.sort((a, b) => a - b);
+                        for(let j = 0; j < intersections.length - 1; j += 2) {
+                            if(intersections[j + 1] !== undefined) {
+                                page.drawLine({
+                                    start: { x: intersections[j], y: fillY },
+                                    end: { x: intersections[j + 1], y: fillY },
+                                    thickness: 1,
+                                    color: fillColor,
+                                    opacity: fillOpacity * 0.6
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Gambar border/outline
+                    for(let i = 0; i < ring.length - 1; i++){
+                        const [x1, y1] = project(ring[i]);
+                        const [x2, y2] = project(ring[i + 1]);
+                        
+                        page.drawLine({
+                            start: { x: x1, y: y1 },
+                            end: { x: x2, y: y2 },
+                            thickness: lineWidth,
+                            color: strokeColor,
+                            opacity: 1
+                        });
+                    }
+                    
+                    const [xFirst, yFirst] = project(ring[0]);
+                    const [xLast, yLast] = project(ring[ring.length - 1]);
+                    page.drawLine({
+                        start: { x: xLast, y: yLast },
+                        end: { x: xFirst, y: yFirst },
+                        thickness: lineWidth,
+                        color: strokeColor,
+                        opacity: 1
+                    });
+                });
+            }
+        
+            // ---- LINESTRING ----
+            else if (type === "LineString") {
+                for(let i = 0; i < f.geometry.coordinates.length - 1; i++){
+                    const [x1, y1] = project(f.geometry.coordinates[i]);
+                    const [x2, y2] = project(f.geometry.coordinates[i + 1]);
                     
                     page.drawLine({
                         start: { x: x1, y: y1 },
                         end: { x: x2, y: y2 },
-                        thickness: 2,
-                        color: layerColor,
-                        opacity: 0.9
+                        thickness: lineWidth,
+                        color: strokeColor,
+                        opacity: 1
                     });
                 }
-                
-                const [xFirst, yFirst] = project(ring[0]);
-                const [xLast, yLast] = project(ring[ring.length - 1]);
-                page.drawLine({
-                    start: { x: xLast, y: yLast },
-                    end: { x: xFirst, y: yFirst },
-                    thickness: 2,
-                    color: layerColor,
-                    opacity: 0.9
-                });
-            });
-        }
-    
-        // ---- LINESTRING ----
-        else if (type === "LineString") {
-            for(let i = 0; i < f.geometry.coordinates.length - 1; i++){
-                const [x1, y1] = project(f.geometry.coordinates[i]);
-                const [x2, y2] = project(f.geometry.coordinates[i + 1]);
-                
-                page.drawLine({
-                    start: { x: x1, y: y1 },
-                    end: { x: x2, y: y2 },
-                    thickness: 1.5,
-                    color: rgb(0.8, 0.2, 0.2),
-                    opacity: 1
-                });
             }
-        }
+        });
     });
 
     // --------- HEADER ---------
@@ -621,27 +672,30 @@ async function exportPdfFromLayers() {
     page.drawText("KETERANGAN:", { x: legendX, y: legendY, size: 12, color: rgb(0, 0, 0) });
     legendY -= 20;
     
-    // Polygon layers
-    let layerIdx = 0;
+    // Polygon layers dengan warna sesuai style
     Object.keys(uploadedFiles).forEach(id => {
         const meta = uploadedFiles[id];
-        const layerColor = colors[layerIdx % colors.length];
         
-        // Box warna
+        // Konversi warna layer ke RGB untuk legenda
+        const fillRgb = hexToRgb(meta.fillColor || meta.color || '#0077ff');
+        const strokeRgb = hexToRgb(meta.color || '#0077ff');
+        
+        // Box warna sesuai fill layer
         page.drawRectangle({
             x: legendX,
             y: legendY - 8,
             width: 15,
             height: 8,
-            color: layerColor,
-            borderColor: rgb(0, 0, 0),
-            borderWidth: 0.5
+            color: rgb(fillRgb.r, fillRgb.g, fillRgb.b),
+            borderColor: rgb(strokeRgb.r, strokeRgb.g, strokeRgb.b),
+            borderWidth: 1,
+            opacity: meta.fillOpacity || 0.4
         });
         
         // Nama layer + luas
-        const gj = meta.group.toGeoJSON();
+        const layerGj = meta.group.toGeoJSON();
         let layerArea = 0;
-        gj.features.forEach(f => {
+        layerGj.features.forEach(f => {
             if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
                 layerArea += turf.area(f);
             }
@@ -653,17 +707,7 @@ async function exportPdfFromLayers() {
         });
         
         legendY -= 15;
-        layerIdx++;
     });
-    
-    // Garis jalan
-    page.drawLine({
-        start: { x: legendX, y: legendY - 4 },
-        end: { x: legendX + 15, y: legendY - 4 },
-        thickness: 2,
-        color: rgb(0.8, 0.2, 0.2)
-    });
-    page.drawText("Jalan / Garis", { x: legendX + 20, y: legendY - 7, size: 9, color: rgb(0, 0, 0) });
     
     legendY -= 25;
     
