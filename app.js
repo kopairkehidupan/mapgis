@@ -387,7 +387,7 @@ async function exportPdfFromLayers() {
     const { PDFDocument, rgb } = PDFLib;
 
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([1400, 900]);  // ukuran landscape
+    const page = pdfDoc.addPage([1400, 900]);
 
     const gj = editableLayers.toGeoJSON();
     if (!gj || !gj.features || gj.features.length === 0) {
@@ -396,7 +396,7 @@ async function exportPdfFromLayers() {
     }
 
     // --------- Hitung bounding box ---------
-    const bbox = turf.bbox(gj);  // [minX, minY, maxX, maxY]
+    const bbox = turf.bbox(gj);
     const [minX, minY, maxX, maxY] = bbox;
 
     const width = 1100; 
@@ -405,77 +405,78 @@ async function exportPdfFromLayers() {
     const offsetY = 100;
 
     function project([lng, lat]) {
-
         const dx = maxX - minX;
         const dy = maxY - minY;
-    
         const scale = Math.min(width / dx, height / dy);
-    
         const x = offsetX + (lng - minX) * scale;
         const y = offsetY + (maxY - lat) * scale;
-    
         return [x, y];
     }
-
-    const ctx = page.getContext ? page.getContext() : null;
 
     // --------- Gambar Semua Polygon & Polyline ---------
     gj.features.forEach(f => {
         if (!f.geometry) return;
-    
         const type = f.geometry.type;
     
         // ---- POLYGON ----
         if (type === "Polygon") {
             f.geometry.coordinates.forEach(ring => {
-                let path = "";
-    
-                ring.forEach((c, idx) => {
-                    const [x, y] = project(c);
-                    path += (idx === 0)
-                        ? `M ${x} ${y} `
-                        : `L ${x} ${y} `;
-                });
-    
-                path += "Z"; // tutup polygon
-    
-                page.drawSvgPath(path, {
-                    stroke: true,
-                    strokeColor: rgb(0.1, 0.3, 0.8),
-                    strokeWidth: 1,
+                // Gambar fill polygon dengan rectangle kecil-kecil (workaround)
+                for(let i = 0; i < ring.length - 1; i++){
+                    const [x1, y1] = project(ring[i]);
+                    const [x2, y2] = project(ring[i + 1]);
+                    
+                    page.drawLine({
+                        start: { x: x1, y: y1 },
+                        end: { x: x2, y: y2 },
+                        thickness: 2,
+                        color: rgb(0, 0.5, 1),
+                        opacity: 0.8
+                    });
+                }
                 
-                    fill: true,
-                    color: rgb(0.6, 0.8, 1)
+                // Tutup polygon
+                const [xFirst, yFirst] = project(ring[0]);
+                const [xLast, yLast] = project(ring[ring.length - 1]);
+                page.drawLine({
+                    start: { x: xLast, y: yLast },
+                    end: { x: xFirst, y: yFirst },
+                    thickness: 2,
+                    color: rgb(0, 0.5, 1),
+                    opacity: 0.8
                 });
             });
         }
     
         // ---- LINESTRING ----
         else if (type === "LineString") {
-            let path = "";
-    
-            f.geometry.coordinates.forEach((c, idx) => {
-                const [x, y] = project(c);
-                path += (idx === 0)
-                    ? `M ${x} ${y} `
-                    : `L ${x} ${y} `;
-            });
-    
-            page.drawSvgPath(path, {
-                stroke: true,
-                strokeColor: rgb(1, 0, 0),
-                strokeWidth: 2
-            });
+            for(let i = 0; i < f.geometry.coordinates.length - 1; i++){
+                const [x1, y1] = project(f.geometry.coordinates[i]);
+                const [x2, y2] = project(f.geometry.coordinates[i + 1]);
+                
+                page.drawLine({
+                    start: { x: x1, y: y1 },
+                    end: { x: x2, y: y2 },
+                    thickness: 2,
+                    color: rgb(1, 0, 0),
+                    opacity: 1
+                });
+            }
         }
     });
 
     // --------- Judul + Legenda ----------
-    page.drawText("PETA AREAL HASIL OLAHAN", { x: 900, y: 810, size: 24 });
+    page.drawText("PETA AREAL HASIL OLAHAN", { x: 550, y: 850, size: 24, color: rgb(0, 0, 0) });
 
-    page.drawText("Legenda:", { x: 900, y: 760, size: 14 });
-    page.drawText("• Polygon Kebun (Hijau)", { x: 900, y: 740, size: 12 });
-    page.drawText("• Jalan (Merah)", { x: 900, y: 720, size: 12 });
-    page.drawText("• Sungai (Biru)", { x: 900, y: 700, size: 12 });
+    page.drawText("Legenda:", { x: 50, y: 800, size: 14, color: rgb(0, 0, 0) });
+    
+    // Kotak legenda polygon
+    page.drawRectangle({ x: 50, y: 770, width: 20, height: 10, color: rgb(0, 0.5, 1), opacity: 0.8 });
+    page.drawText("Polygon Kebun", { x: 80, y: 770, size: 12, color: rgb(0, 0, 0) });
+    
+    // Garis legenda linestring
+    page.drawLine({ start: {x: 50, y: 750}, end: {x: 70, y: 750}, thickness: 2, color: rgb(1, 0, 0) });
+    page.drawText("Jalan/Garis", { x: 80, y: 745, size: 12, color: rgb(0, 0, 0) });
 
     const pdfBytes = await pdfDoc.save();
     saveAs(new Blob([pdfBytes]), "peta.pdf");
