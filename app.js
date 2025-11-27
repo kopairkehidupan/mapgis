@@ -224,6 +224,12 @@ function openProperties(id){
   el('#labelSizeVal').innerText = meta.labelSettings.textSize;
   el('#labelRotation').value = meta.labelSettings.rotation;
   el('#labelRotationVal').innerText = meta.labelSettings.rotation;
+
+  // Pastikan offsetX dan offsetY ada (untuk backward compatibility)
+  if (typeof meta.labelSettings.offsetX === 'undefined') {
+    meta.labelSettings.offsetX = 0;
+    meta.labelSettings.offsetY = 0;
+  }
   
   // Update labels on map
   updateMapLabels(id);
@@ -322,12 +328,18 @@ function updateMapLabels(id) {
   labelLayers[id] = [];
 
   var gj = meta.group.toGeoJSON();
-  gj.features.forEach(function(f) {
+  gj.features.forEach(function(f, featureIdx) {
     if (!f.geometry || f.geometry.type !== 'Polygon') return;
     
     var centroid = turf.centroid(f);
     var area = turf.area(f);
     var areaHa = (area / 10000).toFixed(2);
+    
+    // Gunakan offset jika ada (dalam derajat geografis)
+    var offsetX = meta.labelSettings.offsetX || 0;
+    var offsetY = meta.labelSettings.offsetY || 0;
+    var labelLat = centroid.geometry.coordinates[1] + offsetY;
+    var labelLng = centroid.geometry.coordinates[0] + offsetX;
     
     var labelHtml = '<div style="' +
       'background:rgba(255,255,255,0.8);' +
@@ -340,23 +352,40 @@ function updateMapLabels(id) {
       'color:' + meta.labelSettings.textColor + ';' +
       'font-size:' + meta.labelSettings.textSize + 'px;' +
       'transform:rotate(' + meta.labelSettings.rotation + 'deg);' +
-      'pointer-events:none;' +
+      'cursor:move;' +
       '">' +
       meta.labelSettings.blockName + '<br>' +
       areaHa + ' Ha' +
       '</div>';
     
     var labelMarker = L.marker(
-      [centroid.geometry.coordinates[1], centroid.geometry.coordinates[0]],
+      [labelLat, labelLng],
       {
         icon: L.divIcon({
           className: 'label-marker',
           html: labelHtml,
           iconSize: null,
           iconAnchor: [0, 0]
-        })
+        }),
+        draggable: true  // PENTING: buat draggable
       }
     );
+    
+    // Event saat label di-drag
+    labelMarker.on('dragend', function(e) {
+      var newLatLng = e.target.getLatLng();
+      var originalCentroid = centroid.geometry.coordinates;
+      
+      // Hitung offset baru dalam derajat
+      var newOffsetX = newLatLng.lng - originalCentroid[0];
+      var newOffsetY = newLatLng.lat - originalCentroid[1];
+      
+      // Simpan offset
+      meta.labelSettings.offsetX = newOffsetX;
+      meta.labelSettings.offsetY = newOffsetY;
+      
+      console.log('Label moved. New offset:', newOffsetX, newOffsetY);
+    });
     
     labelMarker.addTo(map);
     labelLayers[id].push(labelMarker);
@@ -389,12 +418,18 @@ el('#applyLabel').onclick = function(){
   if(!lastSelectedId) return alert('Pilih layer dulu.');
   var meta = uploadedFiles[lastSelectedId];
   
+  // Preserve offset jika sudah ada
+  var existingOffsetX = meta.labelSettings.offsetX || 0;
+  var existingOffsetY = meta.labelSettings.offsetY || 0;
+  
   meta.labelSettings = {
     show: el('#labelShow').checked,
     blockName: el('#labelBlockName').value.trim() || meta.name.replace('.gpx', ''),
     textColor: el('#labelTextColor').value,
     textSize: parseInt(el('#labelTextSize').value),
-    rotation: parseInt(el('#labelRotation').value)
+    rotation: parseInt(el('#labelRotation').value),
+    offsetX: existingOffsetX,  // Keep existing offset
+    offsetY: existingOffsetY
   };
   
   updateMapLabels(lastSelectedId);
@@ -414,6 +449,16 @@ el('#revertLabel').onclick = function(){
   };
   openProperties(lastSelectedId);
   updateMapLabels(lastSelectedId);
+};
+
+// Reset label position
+el('#resetLabelPosition').onclick = function(){
+  if(!lastSelectedId) return;
+  var meta = uploadedFiles[lastSelectedId];
+  meta.labelSettings.offsetX = 0;
+  meta.labelSettings.offsetY = 0;
+  updateMapLabels(lastSelectedId);
+  alert('Posisi label direset ke tengah polygon.');
 };
 
 // apply style to lastSelectedId
@@ -505,7 +550,9 @@ el('#btnUpload').onclick = function(){
         blockName: file.name.replace('.gpx', ''),
         textColor: '#000000',
         textSize: 12,
-        rotation: 0
+        rotation: 0,
+        offsetX: 0,  // offset dalam meter (geografis)
+        offsetY: 0
       }
     };
 
@@ -761,7 +808,15 @@ async function exportPdfFromLayers() {
                     // ===== LABEL DI DALAM POLYGON (gunakan labelSettings) =====
                     if (meta.labelSettings && meta.labelSettings.show) {
                       const centroid = turf.centroid(f);
-                      const [centX, centY] = project(centroid.geometry.coordinates);
+  
+                      // Gunakan offset dari labelSettings
+                      const offsetX = meta.labelSettings.offsetX || 0;
+                      const offsetY = meta.labelSettings.offsetY || 0;
+                      const labelCoords = [
+                        centroid.geometry.coordinates[0] + offsetX,
+                        centroid.geometry.coordinates[1] + offsetY
+                      ];
+                      const [centX, centY] = project(labelCoords);
                       
                       const areaHa = (area / 10000).toFixed(2);
                       
