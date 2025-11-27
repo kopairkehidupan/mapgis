@@ -5,27 +5,27 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22}).a
 // ===== BASEMAP LAYERS =====
 var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 22,
-  attribution: '© OpenStreetMap contributors'
+  attribution: 'Erik Simarmata'
 });
 
 var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 22,
-  attribution: 'Tiles © Esri'
+  attribution: 'Erik Simarmata'
 });
 
 var topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
   maxZoom: 17,
-  attribution: '© OpenTopoMap contributors'
+  attribution: 'Erik Simarmata'
 });
 
 var cartoDBLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   maxZoom: 22,
-  attribution: '© CartoDB'
+  attribution: 'Erik Simarmata'
 });
 
 var cartoDBDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
   maxZoom: 22,
-  attribution: '© CartoDB'
+  attribution: 'Erik Simarmata'
 });
 
 // Tambahkan default layer (OpenStreetMap)
