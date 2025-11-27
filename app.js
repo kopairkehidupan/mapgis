@@ -953,14 +953,15 @@ async function exportPdfFromLayers() {
                       
                       // Adjust ukuran teks berdasarkan ukuran polygon
                       // Jika polygon kecil, kurangi ukuran teks
-                      if (polySize < 30) {
-                        labelSize = Math.max(6, labelSize * 0.4); // Min 6pt
-                      } else if (polySize < 50) {
-                        labelSize = Math.max(7, labelSize * 0.5); // Min 7pt
-                      } else if (polySize < 80) {
-                        labelSize = Math.max(8, labelSize * 0.65); // Min 8pt
-                      } else if (polySize < 120) {
-                        labelSize = Math.max(9, labelSize * 0.8); // Min 9pt
+                      // Adjust ukuran teks berdasarkan ukuran polygon (AGRESIF)
+                      if (polySize < 40) {
+                        labelSize = Math.max(5, labelSize * 0.3); // Min 5pt, 30% dari asli
+                      } else if (polySize < 70) {
+                        labelSize = Math.max(6, labelSize * 0.45); // Min 6pt
+                      } else if (polySize < 100) {
+                        labelSize = Math.max(7, labelSize * 0.6); // Min 7pt
+                      } else if (polySize < 150) {
+                        labelSize = Math.max(9, labelSize * 0.75); // Min 9pt
                       }
                       // Polygon besar tetap pakai ukuran asli
                       
