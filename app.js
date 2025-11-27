@@ -16,9 +16,7 @@ map.on(L.Draw.Event.CREATED, function(e){ editableLayers.addLayer(e.layer); });
 map.on(L.Draw.Event.EDITED, function(e) {
   var layers = e.layers;
   
-  // Cari layer mana yang di-edit dan update labelnya
   layers.eachLayer(function(editedLayer) {
-    // Cari uploadedFile mana yang mengandung layer ini
     Object.keys(uploadedFiles).forEach(function(id) {
       var meta = uploadedFiles[id];
       var found = false;
@@ -30,11 +28,13 @@ map.on(L.Draw.Event.EDITED, function(e) {
       });
       
       if (found) {
-        // Update label untuk file ini
         console.log('Layer edited for file:', meta.name);
+        
+        // Re-attach click event setelah edit
+        attachLayerClickEvent(editedLayer, id);
+        
         updateMapLabels(id);
         
-        // Update stats di properties panel jika sedang dibuka
         if (lastSelectedId === id) {
           updatePropertiesStats(id);
         }
@@ -114,7 +114,8 @@ var lastSelectedId = null;
 var labelLayers = {}; // id -> array of label markers
 
 // --- Helpers: create group from GeoJSON, adding each sublayer to a LayerGroup ---
-function createGroupFromGeoJSON(geojson, styleMeta){
+// --- Helpers: create group from GeoJSON, adding each sublayer to a LayerGroup ---
+function createGroupFromGeoJSON(geojson, styleMeta, fileId){
   styleMeta = styleMeta || {};
 
   // HARUS FeatureGroup supaya ada getBounds()
@@ -159,10 +160,32 @@ function createGroupFromGeoJSON(geojson, styleMeta){
 
   // PENTING: pindahkan SEMUA sublayer geojson ke FeatureGroup
   base.eachLayer(function(layer){
+    // Attach click event jika fileId tersedia
+    if (fileId) {
+      attachLayerClickEvent(layer, fileId);
+    }
     group.addLayer(layer);
   });
 
   return group;
+}
+
+// --- Helper: Attach click event to layers ---
+function attachLayerClickEvent(layer, fileId) {
+  layer.on('click', function(e) {
+    L.DomEvent.stopPropagation(e); // Prevent map click event
+    console.log('Layer clicked, opening properties for:', fileId);
+    openProperties(fileId);
+  });
+}
+
+// --- Helper: Attach click event to layers ---
+function attachLayerClickEvent(layer, fileId) {
+  layer.on('click', function(e) {
+    L.DomEvent.stopPropagation(e); // Prevent map click event
+    console.log('Layer clicked, opening properties for:', fileId);
+    openProperties(fileId);
+  });
 }
 
 // --- Utility: simple GPX exporter for GeoJSON (points as wpt, lines/polygons as trk) ---
@@ -662,7 +685,7 @@ el('#btnUpload').onclick = function(){
           markerSymbol: 'circle'
         };
 
-        var group = createGroupFromGeoJSON(geojson, metaDefaults);
+        var group = createGroupFromGeoJSON(geojson, metaDefaults, id);
         var bounds = group.getBounds();
 
         uploadedFiles[id] = {
