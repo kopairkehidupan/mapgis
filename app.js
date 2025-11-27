@@ -12,6 +12,74 @@ var drawControl = new L.Control.Draw({
 map.addControl(drawControl);
 map.on(L.Draw.Event.CREATED, function(e){ editableLayers.addLayer(e.layer); });
 
+// ===== TAMBAHAN BARU: Event listener untuk edit layer =====
+map.on(L.Draw.Event.EDITED, function(e) {
+  var layers = e.layers;
+  
+  // Cari layer mana yang di-edit dan update labelnya
+  layers.eachLayer(function(editedLayer) {
+    // Cari uploadedFile mana yang mengandung layer ini
+    Object.keys(uploadedFiles).forEach(function(id) {
+      var meta = uploadedFiles[id];
+      var found = false;
+      
+      meta.group.eachLayer(function(layer) {
+        if (layer === editedLayer) {
+          found = true;
+        }
+      });
+      
+      if (found) {
+        // Update label untuk file ini
+        console.log('Layer edited for file:', meta.name);
+        updateMapLabels(id);
+        
+        // Update stats di properties panel jika sedang dibuka
+        if (lastSelectedId === id) {
+          updatePropertiesStats(id);
+        }
+      }
+    });
+  });
+});
+
+map.on(L.Draw.Event.DELETED, function(e) {
+  // Saat layer dihapus, update semua label
+  Object.keys(uploadedFiles).forEach(function(id) {
+    updateMapLabels(id);
+    if (lastSelectedId === id) {
+      updatePropertiesStats(id);
+    }
+  });
+});
+
+// Event untuk vertex drag (real-time update)
+map.on('draw:editvertex', function(e) {
+  // Cari layer yang sedang di-edit
+  Object.keys(uploadedFiles).forEach(function(id) {
+    var meta = uploadedFiles[id];
+    var found = false;
+    
+    meta.group.eachLayer(function(layer) {
+      if (layer === e.layer) {
+        found = true;
+      }
+    });
+    
+    if (found) {
+      // Delay update agar tidak terlalu sering (throttle)
+      if (meta._updateTimeout) clearTimeout(meta._updateTimeout);
+      
+      meta._updateTimeout = setTimeout(function() {
+        updateMapLabels(id);
+        if (lastSelectedId === id) {
+          updatePropertiesStats(id);
+        }
+      }, 100); // Update setiap 100ms
+    }
+  });
+});
+
 // --- State ---
 var uploadedFiles = {}; // id -> { name, group:LayerGroup, bounds, color, weight, fillColor, fillOpacity, dashArray, markerSymbol }
 var lastSelectedId = null;
@@ -196,6 +264,10 @@ function openProperties(id){
   lastSelectedId = id;
   var panel = el('#propertiesPanel'); panel.classList.remove('hidden');
   el('#propName').value = meta.name;
+
+  // Update stats menggunakan helper function
+  updatePropertiesStats(id);
+  
   // stats: counts, length, area
   var gj = meta.group.toGeoJSON();
   var cnt = gj.features.length;
@@ -231,6 +303,27 @@ function openProperties(id){
   
   // Update labels on map
   updateMapLabels(id);
+}
+
+// Fungsi helper untuk update statistics di properties panel
+function updatePropertiesStats(id) {
+  var meta = uploadedFiles[id];
+  if (!meta) return;
+  
+  var gj = meta.group.toGeoJSON();
+  var cnt = gj.features.length;
+  var len = 0, area = 0;
+  
+  gj.features.forEach(function(f){
+    if(f.geometry && (f.geometry.type==='LineString' || f.geometry.type==='MultiLineString')) {
+      len += turf.length(f, {units:'meters'}) * 1000;
+    }
+    if(f.geometry && (f.geometry.type==='Polygon' || f.geometry.type==='MultiPolygon')) {
+      area += turf.area(f);
+    }
+  });
+  
+  el('#propStats').innerText = 'Features: ' + cnt + '  •  Length ≈ ' + Math.round(len) + ' m  •  Area ≈ ' + Math.round(area) + ' m²';
 }
 
 // Tambahkan setelah fungsi openProperties (sekitar baris 230)
