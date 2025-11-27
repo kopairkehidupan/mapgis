@@ -54,10 +54,13 @@
     <div id="sidebar">
       <h3>Mini ArcGIS — Advanced</h3>
 
-      <div>
-        <label>Upload GPX</label><br>
-        <input type="file" id="gpxFile" accept=".gpx" multiple><br><br>
-        <button id="btnUpload" class="btn-small">Upload & Tampilkan</button>
+      <div class="control-panel">
+        <h3>Upload GPX Files</h3>
+        <input type="file" id="gpxFile" accept=".gpx" multiple>
+        <button id="btnUpload">Upload</button>
+        <div id="uploadProgress" style="display:none; margin-top:10px; color:#666;">
+          Uploading: <span id="progressText">0/0</span> files...
+        </div>
         <hr>
         <button id="btnPrintPdf" class="btn-small">Print Peta (PDF)</button>
       </div>
