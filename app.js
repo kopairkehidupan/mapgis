@@ -44,13 +44,41 @@ map.on(L.Draw.Event.EDITED, function(e) {
 });
 
 map.on(L.Draw.Event.DELETED, function(e) {
-  // Saat layer dihapus, update semua label
-  Object.keys(uploadedFiles).forEach(function(id) {
-    updateMapLabels(id);
-    if (lastSelectedId === id) {
-      updatePropertiesStats(id);
-    }
+  var layers = e.layers;
+  
+  // Cari layer mana yang dihapus dan hapus labelnya
+  layers.eachLayer(function(deletedLayer) {
+    // Cari uploadedFile mana yang mengandung layer ini
+    Object.keys(uploadedFiles).forEach(function(id) {
+      var meta = uploadedFiles[id];
+      var found = false;
+      var layerToRemove = null;
+      
+      meta.group.eachLayer(function(layer) {
+        if (layer === deletedLayer) {
+          found = true;
+          layerToRemove = layer;
+        }
+      });
+      
+      if (found && layerToRemove) {
+        // Hapus layer dari group
+        meta.group.removeLayer(layerToRemove);
+        
+        // Update label untuk file ini
+        console.log('Layer deleted for file:', meta.name);
+        updateMapLabels(id);
+        
+        // Update stats di properties panel jika sedang dibuka
+        if (lastSelectedId === id) {
+          updatePropertiesStats(id);
+        }
+      }
+    });
   });
+  
+  // PENTING: Bersihkan label yang orphan setelah delete
+  cleanupOrphanLabels();
 });
 
 // Event untuk vertex drag (real-time update)
@@ -212,10 +240,27 @@ function addFileCard(id, meta){
 // Toggle display/hide file
 function toggleFile(id, show){
   var meta = uploadedFiles[id]; if(!meta) return;
+  
   meta.group.eachLayer(function(layer){
-    if(show){ map.addLayer(layer); editableLayers.addLayer(layer); } 
-    else { map.removeLayer(layer); editableLayers.removeLayer(layer); }
+    if(show){ 
+      map.addLayer(layer); 
+      editableLayers.addLayer(layer); 
+    } else { 
+      map.removeLayer(layer); 
+      editableLayers.removeLayer(layer); 
+    }
   });
+  
+  // Toggle label juga
+  if (show) {
+    updateMapLabels(id);
+  } else {
+    if (labelLayers[id]) {
+      labelLayers[id].forEach(function(layer) {
+        map.removeLayer(layer);
+      });
+    }
+  }
 }
 
 // Zoom to file
@@ -225,9 +270,24 @@ function zoomFile(id){ var meta = uploadedFiles[id]; if(!meta) return; if(meta.b
 function deleteFile(id){
   if(!confirm('Hapus file?')) return;
   var meta = uploadedFiles[id]; if(!meta) return;
-  meta.group.eachLayer(function(l){ map.removeLayer(l); editableLayers.removeLayer(l); });
+  
+  // Hapus semua layer dari peta
+  meta.group.eachLayer(function(l){ 
+    map.removeLayer(l); 
+    editableLayers.removeLayer(l); 
+  });
+  
+  // PENTING: Hapus semua label
+  if (labelLayers[id]) {
+    labelLayers[id].forEach(function(layer) {
+      map.removeLayer(layer);
+    });
+    delete labelLayers[id];
+  }
+  
   delete uploadedFiles[id];
-  var node = document.getElementById('file-'+id); if(node) node.remove();
+  var node = document.getElementById('file-'+id); 
+  if(node) node.remove();
   if(lastSelectedId === id) closeProperties();
 }
 
@@ -411,6 +471,37 @@ function updateMapLabels(id) {
     
     labelMarker.addTo(map);
     labelLayers[id].push(labelMarker);
+  });
+}
+
+// Fungsi untuk membersihkan label yang tidak ada layer-nya
+function cleanupOrphanLabels() {
+  Object.keys(labelLayers).forEach(function(id) {
+    var meta = uploadedFiles[id];
+    
+    // Jika file sudah tidak ada, hapus labelnya
+    if (!meta) {
+      if (labelLayers[id]) {
+        labelLayers[id].forEach(function(layer) {
+          map.removeLayer(layer);
+        });
+        delete labelLayers[id];
+      }
+      return;
+    }
+    
+    // Jika group kosong (semua layer dihapus), hapus label
+    var hasLayers = false;
+    meta.group.eachLayer(function() { hasLayers = true; });
+    
+    if (!hasLayers) {
+      if (labelLayers[id]) {
+        labelLayers[id].forEach(function(layer) {
+          map.removeLayer(layer);
+        });
+        labelLayers[id] = [];
+      }
+    }
   });
 }
 
