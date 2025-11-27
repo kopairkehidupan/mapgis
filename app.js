@@ -834,11 +834,10 @@ async function exportPdfFromLayers() {
     function project([lng, lat]) {
         const dx = maxX - minX;
         const dy = maxY - minY;
-        const scale = Math.min(mapWidth / dx, mapHeight / dy) * 0.9; // 0.9 untuk padding
+        const scale = Math.min(mapWidth / dx, mapHeight / dy) * 0.9;
         const centerX = mapOffsetX + mapWidth / 2;
         const centerY = mapOffsetY + mapHeight / 2;
         const x = centerX + (lng - (minX + maxX) / 2) * scale;
-        // PERBAIKAN: Balik arah Y agar sesuai dengan peta geografis (utara di atas)
         const y = centerY + (lat - (minY + maxY) / 2) * scale;
         return [x, y];
     }
@@ -871,7 +870,6 @@ async function exportPdfFromLayers() {
             dashArray: [3, 3]
         });
         
-        // Label koordinat
         const lngLabel = lng.toFixed(4) + "°E";
         page.drawText(lngLabel, { x: x - 20, y: mapOffsetY - 15, size: 8, color: rgb(0, 0, 0) });
     }
@@ -890,13 +888,11 @@ async function exportPdfFromLayers() {
             dashArray: [3, 3]
         });
         
-        // Label koordinat
         const latLabel = lat.toFixed(4) + "°N";
         page.drawText(latLabel, { x: mapOffsetX - 45, y: y - 3, size: 8, color: rgb(0, 0, 0) });
     }
 
-    // --------- Gambar Polygon & Polyline dengan style dari layer ---------
-    let totalArea = 0;
+    // --------- Helper Functions ---------
     
     // Helper: konversi hex color ke RGB
     function hexToRgb(hex) {
@@ -908,12 +904,53 @@ async function exportPdfFromLayers() {
         } : { r: 0, g: 0.5, b: 1 };
     }
 
-    // Gambar berdasarkan file yang diupload (dengan style masing-masing)
+    // Helper: gambar garis dengan dash pattern
+    function drawDashedLine(page, x1, y1, x2, y2, dashPattern, thickness, color) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const lineLength = Math.sqrt(dx * dx + dy * dy);
+        
+        if (lineLength === 0) return;
+        
+        const unitX = dx / lineLength;
+        const unitY = dy / lineLength;
+        
+        let currentPos = 0;
+        let patternIndex = 0;
+        let isDash = true;
+        
+        while (currentPos < lineLength) {
+            const segmentLength = dashPattern[patternIndex % dashPattern.length];
+            const endPos = Math.min(currentPos + segmentLength, lineLength);
+            
+            if (isDash) {
+                const startX = x1 + unitX * currentPos;
+                const startY = y1 + unitY * currentPos;
+                const endX = x1 + unitX * endPos;
+                const endY = y1 + unitY * endPos;
+                
+                page.drawLine({
+                    start: { x: startX, y: startY },
+                    end: { x: endX, y: endY },
+                    thickness: thickness,
+                    color: color,
+                    opacity: 1
+                });
+            }
+            
+            currentPos = endPos;
+            patternIndex++;
+            isDash = !isDash;
+        }
+    }
+
+    // --------- Gambar Polygon & Polyline ---------
+    let totalArea = 0;
+    
     Object.keys(uploadedFiles).forEach(id => {
         const meta = uploadedFiles[id];
         const layerGj = meta.group.toGeoJSON();
         
-        // Konversi warna dari hex ke rgb
         const strokeRgb = hexToRgb(meta.color || '#0077ff');
         const fillRgb = hexToRgb(meta.fillColor || meta.color || '#0077ff');
         const strokeColor = rgb(strokeRgb.r, strokeRgb.g, strokeRgb.b);
@@ -931,16 +968,13 @@ async function exportPdfFromLayers() {
                 totalArea += area;
 
                 f.geometry.coordinates.forEach((ring, ringIdx) => {
-                    // Hanya proses outer ring (index 0)
                     if (ringIdx !== 0) return;
                     
-                    // Gambar fill dengan semi-transparansi
-                    // Metode: gambar banyak garis horizontal untuk simulasi fill
+                    // Gambar fill
                     const allY = ring.map(c => project(c)[1]);
                     const minYPoly = Math.min(...allY);
                     const maxYPoly = Math.max(...allY);
                     
-                    // Fill dengan garis horizontal rapat
                     for(let fillY = minYPoly; fillY <= maxYPoly; fillY += 1) {
                         const intersections = [];
                         for(let i = 0; i < ring.length - 1; i++){
@@ -970,10 +1004,141 @@ async function exportPdfFromLayers() {
                         }
                     }
                     
-                    // Gambar border/outline
-                    for(let i = 0; i < ring.length - 1; i++){
-                        const [x1, y1] = project(ring[i]);
-                        const [x2, y2] = project(ring[i + 1]);
+                    // Gambar border dengan support dash pattern
+                    const dashPattern = meta.dashArray || '';
+                    const isDashed = dashPattern.length > 0;
+
+                    if (isDashed) {
+                        const dashValues = dashPattern.split(',').map(v => parseFloat(v.trim()));
+                        
+                        for(let i = 0; i < ring.length - 1; i++){
+                            const [x1, y1] = project(ring[i]);
+                            const [x2, y2] = project(ring[i + 1]);
+                            drawDashedLine(page, x1, y1, x2, y2, dashValues, lineWidth, strokeColor);
+                        }
+                        
+                        const [xFirst, yFirst] = project(ring[0]);
+                        const [xLast, yLast] = project(ring[ring.length - 1]);
+                        drawDashedLine(page, xLast, yLast, xFirst, yFirst, dashValues, lineWidth, strokeColor);
+                        
+                    } else {
+                        for(let i = 0; i < ring.length - 1; i++){
+                            const [x1, y1] = project(ring[i]);
+                            const [x2, y2] = project(ring[i + 1]);
+                            
+                            page.drawLine({
+                                start: { x: x1, y: y1 },
+                                end: { x: x2, y: y2 },
+                                thickness: lineWidth,
+                                color: strokeColor,
+                                opacity: 1
+                            });
+                        }
+                        
+                        const [xFirst, yFirst] = project(ring[0]);
+                        const [xLast, yLast] = project(ring[ring.length - 1]);
+                        page.drawLine({
+                            start: { x: xLast, y: yLast },
+                            end: { x: xFirst, y: yFirst },
+                            thickness: lineWidth,
+                            color: strokeColor,
+                            opacity: 1
+                        });
+                    }
+                    
+                    // ===== LABEL DI DALAM POLYGON =====
+                    if (meta.labelSettings && meta.labelSettings.show) {
+                        const centroid = turf.centroid(f);
+                        const offsetX = meta.labelSettings.offsetX || 0;
+                        const offsetY = meta.labelSettings.offsetY || 0;
+                        const labelCoords = [
+                            centroid.geometry.coordinates[0] + offsetX,
+                            centroid.geometry.coordinates[1] + offsetY
+                        ];
+                        const [centX, centY] = project(labelCoords);
+                        
+                        const blockName = meta.labelSettings.blockName || meta.name.replace('.gpx', '');
+                        const labelTextColor = hexToRgb(meta.labelSettings.textColor || '#000000');
+                        
+                        let labelSize = meta.labelSettings.textSize || 12;
+                        
+                        const polyBounds = turf.bbox(f);
+                        const [polyMinX, polyMinY, polyMaxX, polyMaxY] = polyBounds;
+                        const [pMinX, pMinY] = project([polyMinX, polyMinY]);
+                        const [pMaxX, pMaxY] = project([polyMaxX, polyMaxY]);
+                        const polyWidth = Math.abs(pMaxX - pMinX);
+                        const polyHeight = Math.abs(pMaxY - pMinY);
+                        const polySize = Math.min(polyWidth, polyHeight);
+                        
+                        if (polySize < 20) {
+                            console.log('Polygon terlalu kecil untuk label:', blockName);
+                            return;
+                        }
+                        
+                        if (polySize < 40) {
+                            labelSize = Math.max(6, labelSize * 0.35);
+                        } else if (polySize < 60) {
+                            labelSize = Math.max(7, labelSize * 0.5);
+                        } else if (polySize < 90) {
+                            labelSize = Math.max(8, labelSize * 0.65);
+                        } else if (polySize < 130) {
+                            labelSize = Math.max(10, labelSize * 0.8);
+                        }
+                        
+                        const labelText = blockName;
+                        const textWidth = labelText.length * (labelSize * 0.5);
+                        const textHeight = labelSize * 1.4;
+                        
+                        if (textWidth > polyWidth * 0.85 || textHeight > polyHeight * 0.85) {
+                            console.log('Label terlalu besar untuk polygon:', blockName);
+                            return;
+                        }
+                        
+                        page.drawRectangle({
+                            x: centX - textWidth/2 - 4,
+                            y: centY - textHeight/2,
+                            width: textWidth + 8,
+                            height: textHeight,
+                            color: rgb(1, 1, 1),
+                            opacity: 0.85
+                        });
+                        
+                        page.drawRectangle({
+                            x: centX - textWidth/2 - 4,
+                            y: centY - textHeight/2,
+                            width: textWidth + 8,
+                            height: textHeight,
+                            borderColor: rgb(0, 0, 0),
+                            borderWidth: 0.5
+                        });
+                        
+                        page.drawText(labelText, {
+                            x: centX - (labelText.length * labelSize * 0.25),
+                            y: centY - (labelSize * 0.25),
+                            size: labelSize,
+                            color: rgb(labelTextColor.r, labelTextColor.g, labelTextColor.b)
+                        });
+                    }
+                });
+            }
+        
+            // ---- LINESTRING ----
+            else if (type === "LineString") {
+                const dashPattern = meta.dashArray || '';
+                const isDashed = dashPattern.length > 0;
+                
+                if (isDashed) {
+                    const dashValues = dashPattern.split(',').map(v => parseFloat(v.trim()));
+                    
+                    for(let i = 0; i < f.geometry.coordinates.length - 1; i++){
+                        const [x1, y1] = project(f.geometry.coordinates[i]);
+                        const [x2, y2] = project(f.geometry.coordinates[i + 1]);
+                        drawDashedLine(page, x1, y1, x2, y2, dashValues, lineWidth, strokeColor);
+                    }
+                } else {
+                    for(let i = 0; i < f.geometry.coordinates.length - 1; i++){
+                        const [x1, y1] = project(f.geometry.coordinates[i]);
+                        const [x2, y2] = project(f.geometry.coordinates[i + 1]);
                         
                         page.drawLine({
                             start: { x: x1, y: y1 },
@@ -983,120 +1148,6 @@ async function exportPdfFromLayers() {
                             opacity: 1
                         });
                     }
-                    
-                    const [xFirst, yFirst] = project(ring[0]);
-                    const [xLast, yLast] = project(ring[ring.length - 1]);
-                    page.drawLine({
-                        start: { x: xLast, y: yLast },
-                        end: { x: xFirst, y: yFirst },
-                        thickness: lineWidth,
-                        color: strokeColor,
-                        opacity: 1
-                    });
-                    
-                    // ===== LABEL DI DALAM POLYGON (hanya nama blok) =====
-                    if (meta.labelSettings && meta.labelSettings.show) {
-                      const centroid = turf.centroid(f);
-                    
-                      // Gunakan offset dari labelSettings
-                      const offsetX = meta.labelSettings.offsetX || 0;
-                      const offsetY = meta.labelSettings.offsetY || 0;
-                      const labelCoords = [
-                        centroid.geometry.coordinates[0] + offsetX,
-                        centroid.geometry.coordinates[1] + offsetY
-                      ];
-                      const [centX, centY] = project(labelCoords);
-                      
-                      // Gunakan label settings
-                      const blockName = meta.labelSettings.blockName || meta.name.replace('.gpx', '');
-                      const labelTextColor = hexToRgb(meta.labelSettings.textColor || '#000000');
-                      
-                      // ===== UKURAN TEKS OTOMATIS BERDASARKAN UKURAN POLYGON =====
-                      let labelSize = meta.labelSettings.textSize || 12;
-                      
-                      // Hitung ukuran polygon di layar (pixel)
-                      const polyBounds = turf.bbox(f);
-                      const [polyMinX, polyMinY, polyMaxX, polyMaxY] = polyBounds;
-                      const [pMinX, pMinY] = project([polyMinX, polyMinY]);
-                      const [pMaxX, pMaxY] = project([polyMaxX, polyMaxY]);
-                      const polyWidth = Math.abs(pMaxX - pMinX);
-                      const polyHeight = Math.abs(pMaxY - pMinY);
-                      const polySize = Math.min(polyWidth, polyHeight);
-                      
-                      // Skip polygon yang terlalu kecil
-                      if (polySize < 20) {
-                        console.log('Polygon terlalu kecil untuk label:', blockName);
-                        return;
-                      }
-                      
-                      // Adjust ukuran teks berdasarkan ukuran polygon
-                      if (polySize < 40) {
-                        labelSize = Math.max(6, labelSize * 0.35);
-                      } else if (polySize < 60) {
-                        labelSize = Math.max(7, labelSize * 0.5);
-                      } else if (polySize < 90) {
-                        labelSize = Math.max(8, labelSize * 0.65);
-                      } else if (polySize < 130) {
-                        labelSize = Math.max(10, labelSize * 0.8);
-                      }
-                      
-                      // HANYA NAMA BLOK (tanpa luas)
-                      const labelText = blockName;
-                      
-                      // Hitung ukuran text box (lebih kecil karena hanya 1 baris)
-                      const textWidth = labelText.length * (labelSize * 0.5);
-                      const textHeight = labelSize * 1.4; // Lebih pendek karena hanya 1 baris
-                      
-                      // CEK: Apakah label muat di dalam polygon?
-                      if (textWidth > polyWidth * 0.85 || textHeight > polyHeight * 0.85) {
-                        console.log('Label terlalu besar untuk polygon:', blockName);
-                        return;
-                      }
-                      
-                      // Background kotak putih
-                      page.drawRectangle({
-                        x: centX - textWidth/2 - 4,
-                        y: centY - textHeight/2,
-                        width: textWidth + 8,
-                        height: textHeight,
-                        color: rgb(1, 1, 1),
-                        opacity: 0.85
-                      });
-                      
-                      // Border kotak
-                      page.drawRectangle({
-                        x: centX - textWidth/2 - 4,
-                        y: centY - textHeight/2,
-                        width: textWidth + 8,
-                        height: textHeight,
-                        borderColor: rgb(0, 0, 0),
-                        borderWidth: 0.5
-                      });
-                      
-                      // Teks nama blok (centered)
-                      page.drawText(labelText, {
-                        x: centX - (labelText.length * labelSize * 0.25),
-                        y: centY - (labelSize * 0.25),
-                        size: labelSize,
-                        color: rgb(labelTextColor.r, labelTextColor.g, labelTextColor.b)
-                      });
-                    }
-                });
-            }
-        
-            // ---- LINESTRING ----
-            else if (type === "LineString") {
-                for(let i = 0; i < f.geometry.coordinates.length - 1; i++){
-                    const [x1, y1] = project(f.geometry.coordinates[i]);
-                    const [x2, y2] = project(f.geometry.coordinates[i + 1]);
-                    
-                    page.drawLine({
-                        start: { x: x1, y: y1 },
-                        end: { x: x2, y: y2 },
-                        thickness: lineWidth,
-                        color: strokeColor,
-                        opacity: 1
-                    });
                 }
             }
         });
@@ -1107,16 +1158,14 @@ async function exportPdfFromLayers() {
         x: 300, y: 560, size: 20, color: rgb(0, 0, 0) 
     });
     
-    // Subtitle (bisa diganti sesuai kebutuhan)
     page.drawText("HASIL PENGOLAHAN GPX", { 
         x: 320, y: 540, size: 12, color: rgb(0.3, 0.3, 0.3) 
     });
 
-    // --------- KOMPAS (Arah Utara) ---------
+    // --------- KOMPAS ---------
     const compassX = 520;
     const compassY = 500;
     
-    // Lingkaran kompas
     page.drawCircle({
         x: compassX,
         y: compassY,
@@ -1125,7 +1174,6 @@ async function exportPdfFromLayers() {
         borderWidth: 1.5
     });
     
-    // Panah utara
     page.drawLine({
         start: { x: compassX, y: compassY },
         end: { x: compassX, y: compassY + 12 },
@@ -1133,7 +1181,6 @@ async function exportPdfFromLayers() {
         color: rgb(0, 0, 0)
     });
     
-    // Ujung panah
     page.drawLine({
         start: { x: compassX, y: compassY + 12 },
         end: { x: compassX - 3, y: compassY + 8 },
@@ -1149,12 +1196,86 @@ async function exportPdfFromLayers() {
     
     page.drawText("U", { x: compassX - 3, y: compassY + 17, size: 10, color: rgb(0, 0, 0) });
 
+    // --------- LEGENDA (dengan 2 kolom jika banyak) ---------
+    const legendX = 580;
+    let legendY = 450;
+    const lineHeight = 15;
+    const maxLegendItems = 12;
+    
+    page.drawText("KETERANGAN:", { x: legendX, y: legendY, size: 12, color: rgb(0, 0, 0) });
+    legendY -= 20;
+    
+    const fileIds = Object.keys(uploadedFiles);
+    const totalFiles = fileIds.length;
+    const useDoubleColumn = totalFiles > maxLegendItems;
+    const itemsPerColumn = useDoubleColumn ? Math.ceil(totalFiles / 2) : totalFiles;
+    
+    fileIds.forEach((id, index) => {
+        const meta = uploadedFiles[id];
+        
+        let currentX = legendX;
+        let currentY = legendY - (index % itemsPerColumn) * lineHeight;
+        
+        if (useDoubleColumn && index >= itemsPerColumn) {
+            currentX = legendX + 120;
+            currentY = legendY - ((index - itemsPerColumn) % itemsPerColumn) * lineHeight;
+        }
+        
+        const fillRgb = hexToRgb(meta.fillColor || meta.color || '#0077ff');
+        const strokeRgb = hexToRgb(meta.color || '#0077ff');
+        
+        page.drawRectangle({
+            x: currentX,
+            y: currentY - 8,
+            width: 15,
+            height: 8,
+            color: rgb(fillRgb.r, fillRgb.g, fillRgb.b),
+            borderColor: rgb(strokeRgb.r, strokeRgb.g, strokeRgb.b),
+            borderWidth: 1,
+            opacity: meta.fillOpacity || 0.4
+        });
+        
+        const layerGj = meta.group.toGeoJSON();
+        let layerArea = 0;
+        layerGj.features.forEach(f => {
+            if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
+                layerArea += turf.area(f);
+            }
+        });
+        
+        const areaHa = (layerArea / 10000).toFixed(2);
+        
+        let displayName = meta.name;
+        if (useDoubleColumn && displayName.length > 15) {
+            displayName = displayName.substring(0, 12) + '...';
+        } else if (!useDoubleColumn && displayName.length > 25) {
+            displayName = displayName.substring(0, 22) + '...';
+        }
+        
+        page.drawText(displayName + " - " + areaHa + " Ha", { 
+            x: currentX + 20, 
+            y: currentY - 7, 
+            size: 8,
+            color: rgb(0, 0, 0) 
+        });
+    });
+    
+    const legendBottomY = legendY - (itemsPerColumn * lineHeight) - 10;
+    
+    // --------- TOTAL LUAS ---------
+    const totalHa = (totalArea / 10000).toFixed(2);
+    page.drawText("Total Luas: " + totalHa + " Ha", { 
+        x: legendX, 
+        y: legendBottomY, 
+        size: 11, 
+        color: rgb(0, 0, 0) 
+    });
+
     // --------- SKALA ---------
-    const scaleX = 580;
-    const scaleY = 120;
+    const scaleX = legendX;
+    const scaleY = legendBottomY - 40;
     const scaleLength = 50;
     
-    // Hitung skala sebenarnya (approx)
     const realDist = turf.distance([minX, minY], [maxX, minY], {units: 'meters'});
     const pixelDist = mapWidth;
     const scaleRatio = Math.round((realDist / pixelDist) * scaleLength);
@@ -1181,58 +1302,6 @@ async function exportPdfFromLayers() {
     page.drawText("0", { x: scaleX - 5, y: scaleY - 15, size: 8, color: rgb(0, 0, 0) });
     page.drawText(scaleRatio + " m", { x: scaleX + scaleLength - 15, y: scaleY - 15, size: 8, color: rgb(0, 0, 0) });
     page.drawText("SKALA", { x: scaleX + 10, y: scaleY + 10, size: 9, color: rgb(0, 0, 0) });
-
-    // --------- LEGENDA ---------
-    const legendX = 580;
-    let legendY = 450;
-    
-    page.drawText("KETERANGAN:", { x: legendX, y: legendY, size: 12, color: rgb(0, 0, 0) });
-    legendY -= 20;
-    
-    // Polygon layers dengan warna sesuai style
-    Object.keys(uploadedFiles).forEach(id => {
-        const meta = uploadedFiles[id];
-        
-        // Konversi warna layer ke RGB untuk legenda
-        const fillRgb = hexToRgb(meta.fillColor || meta.color || '#0077ff');
-        const strokeRgb = hexToRgb(meta.color || '#0077ff');
-        
-        // Box warna sesuai fill layer
-        page.drawRectangle({
-            x: legendX,
-            y: legendY - 8,
-            width: 15,
-            height: 8,
-            color: rgb(fillRgb.r, fillRgb.g, fillRgb.b),
-            borderColor: rgb(strokeRgb.r, strokeRgb.g, strokeRgb.b),
-            borderWidth: 1,
-            opacity: meta.fillOpacity || 0.4
-        });
-        
-        // Nama layer + luas
-        const layerGj = meta.group.toGeoJSON();
-        let layerArea = 0;
-        layerGj.features.forEach(f => {
-            if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
-                layerArea += turf.area(f);
-            }
-        });
-        
-        const areaHa = (layerArea / 10000).toFixed(2);
-        page.drawText(meta.name + " - " + areaHa + " Ha", { 
-            x: legendX + 20, y: legendY - 7, size: 9, color: rgb(0, 0, 0) 
-        });
-        
-        legendY -= 15;
-    });
-    
-    legendY -= 25;
-    
-    // Total luas
-    const totalHa = (totalArea / 10000).toFixed(2);
-    page.drawText("Total Luas: " + totalHa + " Ha", { 
-        x: legendX, y: legendY, size: 11, color: rgb(0, 0, 0) 
-    });
 
     // --------- FOOTER ---------
     const now = new Date();
