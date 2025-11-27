@@ -2,6 +2,50 @@
 var map = L.map('map').setView([0.5,101.4],12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22}).addTo(map);
 
+// ===== BASEMAP LAYERS =====
+var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 22,
+  attribution: '© OpenStreetMap contributors'
+});
+
+var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 22,
+  attribution: 'Tiles © Esri'
+});
+
+var topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  maxZoom: 17,
+  attribution: '© OpenTopoMap contributors'
+});
+
+var cartoDBLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 22,
+  attribution: '© CartoDB'
+});
+
+var cartoDBDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 22,
+  attribution: '© CartoDB'
+});
+
+// Tambahkan default layer (OpenStreetMap)
+osmLayer.addTo(map);
+
+// ===== LAYER CONTROL =====
+var baseMaps = {
+  "OpenStreetMap": osmLayer,
+  "Satellite": satelliteLayer,
+  "Topographic": topoLayer,
+  "CartoDB Light": cartoDBLight,
+  "CartoDB Dark": cartoDBDark
+};
+
+// Tambahkan Layer Control ke peta
+L.control.layers(baseMaps, null, {
+  position: 'topright',
+  collapsed: true
+}).addTo(map);
+
 // Editable group for Leaflet.draw
 var editableLayers = new L.FeatureGroup().addTo(map);
 
