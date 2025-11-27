@@ -763,26 +763,6 @@ el('#btnUpload').onclick = function(){
   });
 };
 
-// --- Helper: Generate random color for each file ---
-function getRandomColor() {
-  var colors = [
-    '#0077ff', // Biru
-    '#ff5733', // Merah
-    '#33ff57', // Hijau
-    '#ff33f5', // Magenta
-    '#f5ff33', // Kuning
-    '#33f5ff', // Cyan
-    '#ff8c33', // Orange
-    '#8c33ff', // Ungu
-    '#33ff8c', // Hijau Muda
-    '#ff3333', // Merah Tua
-    '#3333ff', // Biru Tua
-    '#33ff33'  // Hijau Terang
-  ];
-  
-  return colors[Math.floor(Math.random() * colors.length)];
-}
-
 // close properties if click outside
 map.on('click', function(){ /* keep panel open to edit; optionally close */ });
 
