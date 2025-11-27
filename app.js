@@ -921,7 +921,6 @@ async function exportPdfFromLayers() {
                     });
                     
                     // ===== LABEL DI DALAM POLYGON (gunakan labelSettings) =====
-                    // ===== LABEL DI DALAM POLYGON (gunakan labelSettings) =====
                     if (meta.labelSettings && meta.labelSettings.show) {
                       const centroid = turf.centroid(f);
                     
@@ -939,7 +938,31 @@ async function exportPdfFromLayers() {
                       // Gunakan label settings
                       const blockName = meta.labelSettings.blockName || meta.name.replace('.gpx', '');
                       const labelTextColor = hexToRgb(meta.labelSettings.textColor || '#000000');
-                      const labelSize = meta.labelSettings.textSize || 12;
+                      
+                      // ===== UKURAN TEKS OTOMATIS BERDASARKAN LUAS POLYGON =====
+                      let labelSize = meta.labelSettings.textSize || 12;
+                      
+                      // Hitung ukuran polygon di layar (pixel)
+                      const polyBounds = turf.bbox(f);
+                      const [polyMinX, polyMinY, polyMaxX, polyMaxY] = polyBounds;
+                      const [pMinX, pMinY] = project([polyMinX, polyMinY]);
+                      const [pMaxX, pMaxY] = project([polyMaxX, polyMaxY]);
+                      const polyWidth = Math.abs(pMaxX - pMinX);
+                      const polyHeight = Math.abs(pMaxY - pMinY);
+                      const polySize = Math.min(polyWidth, polyHeight); // Ambil dimensi terkecil
+                      
+                      // Adjust ukuran teks berdasarkan ukuran polygon
+                      // Jika polygon kecil, kurangi ukuran teks
+                      if (polySize < 30) {
+                        labelSize = Math.max(6, labelSize * 0.4); // Min 6pt
+                      } else if (polySize < 50) {
+                        labelSize = Math.max(7, labelSize * 0.5); // Min 7pt
+                      } else if (polySize < 80) {
+                        labelSize = Math.max(8, labelSize * 0.65); // Min 8pt
+                      } else if (polySize < 120) {
+                        labelSize = Math.max(9, labelSize * 0.8); // Min 9pt
+                      }
+                      // Polygon besar tetap pakai ukuran asli
                       
                       // Text yang akan ditampilkan
                       const line1 = blockName;
@@ -947,6 +970,14 @@ async function exportPdfFromLayers() {
                       
                       const textWidth = Math.max(line1.length, line2.length) * (labelSize * 0.5);
                       const textHeight = labelSize * 2.5;
+                      
+                      // CEK: Apakah label muat di dalam polygon?
+                      // Jika terlalu besar, skip label (jangan gambar)
+                      if (textWidth > polyWidth * 0.9 || textHeight > polyHeight * 0.9) {
+                        // Label terlalu besar untuk polygon ini, skip
+                        console.log('Label terlalu besar untuk polygon:', blockName);
+                        return; // Skip menggambar label
+                      }
                       
                       // Background kotak putih
                       page.drawRectangle({
