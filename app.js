@@ -920,7 +920,7 @@ async function exportPdfFromLayers() {
                         opacity: 1
                     });
                     
-                    // ===== LABEL DI DALAM POLYGON (gunakan labelSettings) =====
+                    // ===== LABEL DI DALAM POLYGON (hanya nama blok) =====
                     if (meta.labelSettings && meta.labelSettings.show) {
                       const centroid = turf.centroid(f);
                     
@@ -933,13 +933,11 @@ async function exportPdfFromLayers() {
                       ];
                       const [centX, centY] = project(labelCoords);
                       
-                      const areaHa = (area / 10000).toFixed(2);
-                      
                       // Gunakan label settings
                       const blockName = meta.labelSettings.blockName || meta.name.replace('.gpx', '');
                       const labelTextColor = hexToRgb(meta.labelSettings.textColor || '#000000');
                       
-                      // ===== UKURAN TEKS OTOMATIS BERDASARKAN LUAS POLYGON =====
+                      // ===== UKURAN TEKS OTOMATIS BERDASARKAN UKURAN POLYGON =====
                       let labelSize = meta.labelSettings.textSize || 12;
                       
                       // Hitung ukuran polygon di layar (pixel)
@@ -949,69 +947,62 @@ async function exportPdfFromLayers() {
                       const [pMaxX, pMaxY] = project([polyMaxX, polyMaxY]);
                       const polyWidth = Math.abs(pMaxX - pMinX);
                       const polyHeight = Math.abs(pMaxY - pMinY);
-                      const polySize = Math.min(polyWidth, polyHeight); // Ambil dimensi terkecil
+                      const polySize = Math.min(polyWidth, polyHeight);
+                      
+                      // Skip polygon yang terlalu kecil
+                      if (polySize < 20) {
+                        console.log('Polygon terlalu kecil untuk label:', blockName);
+                        return;
+                      }
                       
                       // Adjust ukuran teks berdasarkan ukuran polygon
-                      // Jika polygon kecil, kurangi ukuran teks
-                      // Adjust ukuran teks berdasarkan ukuran polygon (AGRESIF)
                       if (polySize < 40) {
-                        labelSize = Math.max(5, labelSize * 0.3); // Min 5pt, 30% dari asli
-                      } else if (polySize < 70) {
-                        labelSize = Math.max(6, labelSize * 0.45); // Min 6pt
-                      } else if (polySize < 100) {
-                        labelSize = Math.max(7, labelSize * 0.6); // Min 7pt
-                      } else if (polySize < 150) {
-                        labelSize = Math.max(9, labelSize * 0.75); // Min 9pt
+                        labelSize = Math.max(6, labelSize * 0.35);
+                      } else if (polySize < 60) {
+                        labelSize = Math.max(7, labelSize * 0.5);
+                      } else if (polySize < 90) {
+                        labelSize = Math.max(8, labelSize * 0.65);
+                      } else if (polySize < 130) {
+                        labelSize = Math.max(10, labelSize * 0.8);
                       }
-                      // Polygon besar tetap pakai ukuran asli
                       
-                      // Text yang akan ditampilkan
-                      const line1 = blockName;
-                      const line2 = areaHa + " Ha";
+                      // HANYA NAMA BLOK (tanpa luas)
+                      const labelText = blockName;
                       
-                      const textWidth = Math.max(line1.length, line2.length) * (labelSize * 0.5);
-                      const textHeight = labelSize * 2.5;
+                      // Hitung ukuran text box (lebih kecil karena hanya 1 baris)
+                      const textWidth = labelText.length * (labelSize * 0.5);
+                      const textHeight = labelSize * 1.4; // Lebih pendek karena hanya 1 baris
                       
                       // CEK: Apakah label muat di dalam polygon?
-                      // Jika terlalu besar, skip label (jangan gambar)
-                      if (textWidth > polyWidth * 0.9 || textHeight > polyHeight * 0.9) {
-                        // Label terlalu besar untuk polygon ini, skip
+                      if (textWidth > polyWidth * 0.85 || textHeight > polyHeight * 0.85) {
                         console.log('Label terlalu besar untuk polygon:', blockName);
-                        return; // Skip menggambar label
+                        return;
                       }
                       
                       // Background kotak putih
                       page.drawRectangle({
-                        x: centX - textWidth/2 - 3,
+                        x: centX - textWidth/2 - 4,
                         y: centY - textHeight/2,
-                        width: textWidth + 6,
+                        width: textWidth + 8,
                         height: textHeight,
                         color: rgb(1, 1, 1),
-                        opacity: 0.8
+                        opacity: 0.85
                       });
                       
                       // Border kotak
                       page.drawRectangle({
-                        x: centX - textWidth/2 - 3,
+                        x: centX - textWidth/2 - 4,
                         y: centY - textHeight/2,
-                        width: textWidth + 6,
+                        width: textWidth + 8,
                         height: textHeight,
                         borderColor: rgb(0, 0, 0),
                         borderWidth: 0.5
                       });
                       
-                      // Teks nama blok (baris 1)
-                      page.drawText(line1, {
-                        x: centX - (line1.length * labelSize * 0.25),
-                        y: centY + labelSize * 0.3,
-                        size: labelSize,
-                        color: rgb(labelTextColor.r, labelTextColor.g, labelTextColor.b)
-                      });
-                      
-                      // Teks luas (baris 2)
-                      page.drawText(line2, {
-                        x: centX - (line2.length * labelSize * 0.25),
-                        y: centY - labelSize * 0.7,
+                      // Teks nama blok (centered)
+                      page.drawText(labelText, {
+                        x: centX - (labelText.length * labelSize * 0.25),
+                        y: centY - (labelSize * 0.25),
                         size: labelSize,
                         color: rgb(labelTextColor.r, labelTextColor.g, labelTextColor.b)
                       });
