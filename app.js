@@ -1198,7 +1198,7 @@ async function exportPdfFromLayers() {
 
     // --------- LEGENDA (dengan 2 kolom jika banyak) ---------
     const legendX = 580;
-    let legendY = 450;
+    let legendY = mapOffsetY + mapHeight - 20; // Sejajarkan dengan top border peta
     const lineHeight = 15;
     const maxLegendItems = 12;
     
