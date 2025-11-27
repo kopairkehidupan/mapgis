@@ -820,25 +820,6 @@ async function exportPdfFromLayers() {
                       });
                     }
                     
-                    page.drawRectangle({
-                        x: centX - textWidth/2 - 3,
-                        y: centY - 5,
-                        width: textWidth + 6,
-                        height: textHeight,
-                        color: rgb(1, 1, 1),
-                        opacity: 0.8
-                    });
-                    
-                    // Gambar border kotak
-                    page.drawRectangle({
-                        x: centX - textWidth/2 - 3,
-                        y: centY - 5,
-                        width: textWidth + 6,
-                        height: textHeight,
-                        borderColor: rgb(0, 0, 0),
-                        borderWidth: 0.5
-                    });
-                    
                     // Teks label
                     page.drawText(labelText, {
                         x: centX - textWidth/2,
