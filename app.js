@@ -874,7 +874,100 @@ function convertLineToPolygonGeoJSON(gj) {
     };
 }
 
-document.getElementById("btnPrintPdf").onclick = exportPdfFromLayers;
+// ===== TAMBAHKAN DI AKHIR app.js (sebelum // End of app.js) =====
+
+// Variable untuk menyimpan judul PDF
+var pdfSettings = {
+  title: "PETA AREAL KEBUN",
+  subtitle: "HASIL PENGOLAHAN GPX"
+};
+
+// Event handler untuk tombol Print PDF
+document.getElementById("btnPrintPdf").onclick = function() {
+  // Cek apakah ada data
+  const gj = editableLayers.toGeoJSON();
+  if (!gj || !gj.features || gj.features.length === 0) {
+    alert("Tidak ada data untuk dicetak.");
+    return;
+  }
+  
+  // Tampilkan modal
+  showPdfModal();
+};
+
+// Fungsi untuk menampilkan modal
+function showPdfModal() {
+  const modal = document.getElementById('pdfModal');
+  const titleInput = document.getElementById('pdfTitle');
+  const subtitleInput = document.getElementById('pdfSubtitle');
+  
+  // Set nilai default
+  titleInput.value = pdfSettings.title;
+  subtitleInput.value = pdfSettings.subtitle;
+  
+  // Tampilkan modal
+  modal.style.display = 'flex';
+  
+  // Focus ke input pertama
+  setTimeout(() => titleInput.focus(), 100);
+}
+
+// Fungsi untuk menyembunyikan modal
+function hidePdfModal() {
+  const modal = document.getElementById('pdfModal');
+  modal.style.display = 'none';
+}
+
+// Event handler untuk tombol Batal
+document.getElementById('btnCancelPdf').onclick = function() {
+  hidePdfModal();
+};
+
+// Event handler untuk tombol Cetak PDF
+document.getElementById('btnConfirmPdf').onclick = function() {
+  // Ambil nilai dari input
+  const titleInput = document.getElementById('pdfTitle');
+  const subtitleInput = document.getElementById('pdfSubtitle');
+  
+  pdfSettings.title = titleInput.value.trim() || "PETA AREAL KEBUN";
+  pdfSettings.subtitle = subtitleInput.value.trim() || "HASIL PENGOLAHAN GPX";
+  
+  // Sembunyikan modal
+  hidePdfModal();
+  
+  // Mulai generate PDF
+  exportPdfFromLayers();
+};
+
+// Event handler untuk Enter key di input
+document.getElementById('pdfTitle').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    document.getElementById('pdfSubtitle').focus();
+  }
+});
+
+document.getElementById('pdfSubtitle').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    document.getElementById('btnConfirmPdf').click();
+  }
+});
+
+// Event handler untuk Escape key (tutup modal)
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    const modal = document.getElementById('pdfModal');
+    if (modal.style.display === 'flex') {
+      hidePdfModal();
+    }
+  }
+});
+
+// Event handler untuk klik di luar modal (tutup modal)
+document.getElementById('pdfModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    hidePdfModal();
+  }
+});
 
 async function exportPdfFromLayers() {
     const { PDFDocument, rgb } = PDFLib;
@@ -1218,11 +1311,12 @@ async function exportPdfFromLayers() {
     });
 
     // --------- HEADER ---------
-    page.drawText("PETA AREAL KEBUN", { 
+    // Gunakan judul dari pdfSettings
+    page.drawText(pdfSettings.title, { 
         x: 300, y: 560, size: 20, color: rgb(0, 0, 0) 
     });
     
-    page.drawText("HASIL PENGOLAHAN GPX", { 
+    page.drawText(pdfSettings.subtitle, { 
         x: 320, y: 540, size: 12, color: rgb(0.3, 0.3, 0.3) 
     });
 
