@@ -819,14 +819,6 @@ async function exportPdfFromLayers() {
                         rotate: { angle: rad, type: 'radians' }
                       });
                     }
-                    
-                    // Teks label
-                    page.drawText(labelText, {
-                        x: centX - textWidth/2,
-                        y: centY,
-                        size: 8,
-                        color: rgb(0, 0, 0)
-                    });
                 });
             }
         
