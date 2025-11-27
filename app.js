@@ -895,6 +895,15 @@ async function exportPdfFromLayers() {
                             }
                         }
                     }
+
+                    let pdfDashArray = undefined;
+                    if (meta.dashArray) {
+                      // Parse dashArray string "4,4" atau "8,4,2,4" menjadi array [4,4] atau [8,4,2,4]
+                      const dashParts = meta.dashArray.split(',').map(s => parseFloat(s.trim()));
+                      if (dashParts.length > 0 && !dashParts.some(isNaN)) {
+                        pdfDashArray = dashParts;
+                      }
+                    }
                     
                     // Gambar border/outline
                     for(let i = 0; i < ring.length - 1; i++){
@@ -905,8 +914,8 @@ async function exportPdfFromLayers() {
                             start: { x: x1, y: y1 },
                             end: { x: x2, y: y2 },
                             thickness: lineWidth,
-                            color: strokeColor,
-                            opacity: 1
+                            opacity: 1,
+                            dashArray: pdfDashArray // Tambahkan dashArray
                         });
                     }
                     
@@ -917,7 +926,8 @@ async function exportPdfFromLayers() {
                         end: { x: xFirst, y: yFirst },
                         thickness: lineWidth,
                         color: strokeColor,
-                        opacity: 1
+                        opacity: 1,
+                        dashArray: pdfDashArray // Tambahkan dashArray
                     });
                     
                     // ===== LABEL DI DALAM POLYGON (hanya nama blok) =====
@@ -1012,18 +1022,28 @@ async function exportPdfFromLayers() {
         
             // ---- LINESTRING ----
             else if (type === "LineString") {
-                for(let i = 0; i < f.geometry.coordinates.length - 1; i++){
-                    const [x1, y1] = project(f.geometry.coordinates[i]);
-                    const [x2, y2] = project(f.geometry.coordinates[i + 1]);
-                    
-                    page.drawLine({
-                        start: { x: x1, y: y1 },
-                        end: { x: x2, y: y2 },
-                        thickness: lineWidth,
-                        color: strokeColor,
-                        opacity: 1
-                    });
+              // Konversi dashArray untuk LineString
+              let pdfDashArray = undefined;
+              if (meta.dashArray) {
+                const dashParts = meta.dashArray.split(',').map(s => parseFloat(s.trim()));
+                if (dashParts.length > 0 && !dashParts.some(isNaN)) {
+                  pdfDashArray = dashParts;
                 }
+              }
+              
+              for(let i = 0; i < f.geometry.coordinates.length - 1; i++){
+                const [x1, y1] = project(f.geometry.coordinates[i]);
+                const [x2, y2] = project(f.geometry.coordinates[i + 1]);
+                
+                page.drawLine({
+                  start: { x: x1, y: y1 },
+                  end: { x: x2, y: y2 },
+                  thickness: lineWidth,
+                  color: strokeColor,
+                  opacity: 1,
+                  dashArray: pdfDashArray // Tambahkan dashArray
+                });
+              }
             }
         });
     });
