@@ -622,72 +622,166 @@ function exportAllFor(id){
   // user can click desired export button
 }
 
-// --- Upload handler ---
 el('#btnUpload').onclick = function(){
   var fi = el('#gpxFile');
-  if(!fi.files || fi.files.length===0) return alert('Pilih file GPX.');
+  if(!fi.files || fi.files.length === 0) return alert('Pilih file GPX.');
 
-  var file = fi.files[0];
-  var reader = new FileReader();
+  var files = Array.from(fi.files);
+  var totalFiles = files.length;
+  var processedFiles = 0;
+  var allBounds = [];
 
-  reader.onload = function(){
-    var dom = new DOMParser().parseFromString(reader.result,'text/xml');
-    var geojson = toGeoJSON.gpx(dom);
+  // Tampilkan progress
+  var progressDiv = el('#uploadProgress');
+  var progressText = el('#progressText');
+  if(progressDiv) {
+    progressDiv.style.display = 'block';
+    progressText.innerText = '0/' + totalFiles;
+  }
 
-    // 🔥 KONVERSI OTOMATIS DI SINI
-    geojson = convertLineToPolygonGeoJSON(geojson);
+  console.log('Mulai upload ' + totalFiles + ' file...');
 
-    var id = Date.now() + '-' + Math.floor(Math.random()*1000);
+  files.forEach(function(file, index) {
+    var reader = new FileReader();
 
-    var metaDefaults = {
-      color:'#0077ff',
-      weight:3,
-      fillColor:'#0077ff',
-      fillOpacity:0.4,
-      dashArray:null,
-      markerSymbol:'circle'
-    };
+    reader.onload = function(){
+      try {
+        var dom = new DOMParser().parseFromString(reader.result, 'text/xml');
+        var geojson = toGeoJSON.gpx(dom);
+        geojson = convertLineToPolygonGeoJSON(geojson);
 
-    var group = createGroupFromGeoJSON(geojson, metaDefaults);
-    var bounds = group.getBounds();
+        var id = Date.now() + '-' + index + '-' + Math.floor(Math.random()*1000);
+        var randomColor = getRandomColor();
 
-   uploadedFiles[id] = {
-      name: file.name,
-      group: group,
-      bounds: bounds,
-      color: metaDefaults.color,
-      weight: metaDefaults.weight,
-      fillColor: metaDefaults.fillColor,
-      fillOpacity: metaDefaults.fillOpacity,
-      dashArray: metaDefaults.dashArray,
-      markerSymbol: metaDefaults.markerSymbol,
-      labelSettings: {
-        show: true,
-        blockName: file.name.replace('.gpx', ''),
-        textColor: '#000000',
-        textSize: 12,
-        offsetX: 0,  // offset dalam meter (geografis)
-        offsetY: 0
+        var metaDefaults = {
+          color: randomColor,
+          weight: 3,
+          fillColor: randomColor,
+          fillOpacity: 0.4,
+          dashArray: null,
+          markerSymbol: 'circle'
+        };
+
+        var group = createGroupFromGeoJSON(geojson, metaDefaults);
+        var bounds = group.getBounds();
+
+        uploadedFiles[id] = {
+          name: file.name,
+          group: group,
+          bounds: bounds,
+          color: metaDefaults.color,
+          weight: metaDefaults.weight,
+          fillColor: metaDefaults.fillColor,
+          fillOpacity: metaDefaults.fillOpacity,
+          dashArray: metaDefaults.dashArray,
+          markerSymbol: metaDefaults.markerSymbol,
+          labelSettings: {
+            show: true,
+            blockName: file.name.replace('.gpx', ''),
+            textColor: '#000000',
+            textSize: 12,
+            offsetX: 0,
+            offsetY: 0
+          }
+        };
+
+        group.eachLayer(function(l){
+          map.addLayer(l);
+          editableLayers.addLayer(l);
+        });
+
+        addFileCard(id, {
+          name: file.name,
+          summary: (bounds && bounds.isValid() ? "Bounds available" : "No bounds")
+        });
+
+        if(bounds && bounds.isValid()) {
+          allBounds.push(bounds);
+        }
+
+        processedFiles++;
+        
+        // Update progress
+        if(progressText) {
+          progressText.innerText = processedFiles + '/' + totalFiles;
+        }
+        
+        console.log('File ' + processedFiles + '/' + totalFiles + ' berhasil: ' + file.name);
+
+        if(processedFiles === totalFiles) {
+          if(allBounds.length > 0) {
+            var combinedBounds = allBounds[0];
+            for(var i = 1; i < allBounds.length; i++) {
+              combinedBounds.extend(allBounds[i]);
+            }
+            map.fitBounds(combinedBounds);
+          }
+          
+          // Sembunyikan progress
+          if(progressDiv) {
+            setTimeout(function() {
+              progressDiv.style.display = 'none';
+            }, 1000);
+          }
+          
+          alert('Berhasil upload ' + totalFiles + ' file!');
+          fi.value = '';
+        }
+
+      } catch(error) {
+        console.error('Error processing file ' + file.name + ':', error);
+        processedFiles++;
+        
+        if(progressText) {
+          progressText.innerText = processedFiles + '/' + totalFiles;
+        }
+        
+        if(processedFiles === totalFiles) {
+          if(progressDiv) progressDiv.style.display = 'none';
+          alert('Upload selesai dengan beberapa error. Cek console.');
+          fi.value = '';
+        }
       }
     };
 
-    group.eachLayer(function(l){
-      map.addLayer(l);
-      editableLayers.addLayer(l);
-    });
+    reader.onerror = function() {
+      console.error('Error reading file: ' + file.name);
+      processedFiles++;
+      
+      if(progressText) {
+        progressText.innerText = processedFiles + '/' + totalFiles;
+      }
+      
+      if(processedFiles === totalFiles) {
+        if(progressDiv) progressDiv.style.display = 'none';
+        alert('Upload selesai dengan beberapa error. Cek console.');
+        fi.value = '';
+      }
+    };
 
-    addFileCard(id, {
-      name: file.name,
-      summary: (bounds && bounds.isValid() ? "Bounds available" : "No bounds")
-    });
-
-    if(bounds && bounds.isValid()) map.fitBounds(bounds);
-
-    fi.value = '';
-  };
-
-  reader.readAsText(file);
+    reader.readAsText(file);
+  });
 };
+
+// --- Helper: Generate random color for each file ---
+function getRandomColor() {
+  var colors = [
+    '#0077ff', // Biru
+    '#ff5733', // Merah
+    '#33ff57', // Hijau
+    '#ff33f5', // Magenta
+    '#f5ff33', // Kuning
+    '#33f5ff', // Cyan
+    '#ff8c33', // Orange
+    '#8c33ff', // Ungu
+    '#33ff8c', // Hijau Muda
+    '#ff3333', // Merah Tua
+    '#3333ff', // Biru Tua
+    '#33ff33'  // Hijau Terang
+  ];
+  
+  return colors[Math.floor(Math.random() * colors.length)];
+}
 
 // close properties if click outside
 map.on('click', function(){ /* keep panel open to edit; optionally close */ });
