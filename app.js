@@ -222,8 +222,6 @@ function openProperties(id){
   el('#labelTextColor').value = meta.labelSettings.textColor;
   el('#labelTextSize').value = meta.labelSettings.textSize;
   el('#labelSizeVal').innerText = meta.labelSettings.textSize;
-  el('#labelRotation').value = meta.labelSettings.rotation;
-  el('#labelRotationVal').innerText = meta.labelSettings.rotation;
 
   // Pastikan offsetX dan offsetY ada (untuk backward compatibility)
   if (typeof meta.labelSettings.offsetX === 'undefined') {
@@ -236,74 +234,6 @@ function openProperties(id){
 }
 
 // Tambahkan setelah fungsi openProperties (sekitar baris 230)
-
-// Fungsi untuk membuat/update label di peta
-function updateMapLabels(id) {
-  var meta = uploadedFiles[id];
-  if (!meta || !meta.labelSettings.show) {
-    // Hapus label jika ada
-    if (labelLayers[id]) {
-      labelLayers[id].forEach(function(layer) {
-        map.removeLayer(layer);
-      });
-      labelLayers[id] = [];
-    }
-    return;
-  }
-
-  // Hapus label lama
-  if (labelLayers[id]) {
-    labelLayers[id].forEach(function(layer) {
-      map.removeLayer(layer);
-    });
-  }
-  labelLayers[id] = [];
-
-  var gj = meta.group.toGeoJSON();
-  gj.features.forEach(function(f) {
-    if (!f.geometry || f.geometry.type !== 'Polygon') return;
-    
-    var centroid = turf.centroid(f);
-    var area = turf.area(f);
-    var areaHa = (area / 10000).toFixed(2);
-    
-    var labelHtml = '<div style="' +
-      'background:rgba(255,255,255,0.8);' +
-      'padding:4px 8px;' +
-      'border:1px solid #000;' +
-      'border-radius:4px;' +
-      'text-align:center;' +
-      'white-space:nowrap;' +
-      'font-weight:600;' +
-      'color:' + meta.labelSettings.textColor + ';' +
-      'font-size:' + meta.labelSettings.textSize + 'px;' +
-      'transform:rotate(' + meta.labelSettings.rotation + 'deg);' +
-      'pointer-events:none;' +
-      '">' +
-      meta.labelSettings.blockName + '<br>' +
-      areaHa + ' Ha' +
-      '</div>';
-    
-    var labelMarker = L.marker(
-      [centroid.geometry.coordinates[1], centroid.geometry.coordinates[0]],
-      {
-        icon: L.divIcon({
-          className: 'label-marker',
-          html: labelHtml,
-          iconSize: null,
-          iconAnchor: [0, 0]
-        })
-      }
-    );
-    
-    labelMarker.addTo(map);
-    labelLayers[id].push(labelMarker);
-  });
-}
-
-function closeProperties(){ lastSelectedId = null; el('#propertiesPanel').classList.add('hidden'); }
-
-// Tambahkan setelah fungsi closeProperties() (sekitar baris 240)
 
 // Fungsi untuk membuat/update label di peta
 function updateMapLabels(id) {
@@ -351,7 +281,6 @@ function updateMapLabels(id) {
       'font-weight:600;' +
       'color:' + meta.labelSettings.textColor + ';' +
       'font-size:' + meta.labelSettings.textSize + 'px;' +
-      'transform:rotate(' + meta.labelSettings.rotation + 'deg);' +
       'cursor:move;' +
       '">' +
       meta.labelSettings.blockName + '<br>' +
@@ -367,7 +296,7 @@ function updateMapLabels(id) {
           iconSize: null,
           iconAnchor: [0, 0]
         }),
-        draggable: true  // PENTING: buat draggable
+        draggable: true
       }
     );
     
@@ -392,6 +321,8 @@ function updateMapLabels(id) {
   });
 }
 
+function closeProperties(){ lastSelectedId = null; el('#propertiesPanel').classList.add('hidden'); }
+
 // hook save name
 el('#propSaveName').onclick = function(){
   if(!lastSelectedId) return;
@@ -411,7 +342,6 @@ el('#styleFillOpacity').oninput = function(){ el('#fillOpacityVal').innerText = 
 
 // Label controls live display
 el('#labelTextSize').oninput = function(){ el('#labelSizeVal').innerText = this.value; };
-el('#labelRotation').oninput = function(){ el('#labelRotationVal').innerText = this.value; };
 
 // Apply label settings
 el('#applyLabel').onclick = function(){
@@ -427,9 +357,9 @@ el('#applyLabel').onclick = function(){
     blockName: el('#labelBlockName').value.trim() || meta.name.replace('.gpx', ''),
     textColor: el('#labelTextColor').value,
     textSize: parseInt(el('#labelTextSize').value),
-    rotation: parseInt(el('#labelRotation').value),
-    offsetX: existingOffsetX,  // Keep existing offset
+    offsetX: existingOffsetX,
     offsetY: existingOffsetY
+    // HAPUS rotation
   };
   
   updateMapLabels(lastSelectedId);
@@ -445,7 +375,9 @@ el('#revertLabel').onclick = function(){
     blockName: meta.name.replace('.gpx', ''),
     textColor: '#000000',
     textSize: 12,
-    rotation: 0
+    offsetX: meta.labelSettings.offsetX || 0,  // Keep position
+    offsetY: meta.labelSettings.offsetY || 0
+    // HAPUS rotation
   };
   openProperties(lastSelectedId);
   updateMapLabels(lastSelectedId);
@@ -550,7 +482,6 @@ el('#btnUpload').onclick = function(){
         blockName: file.name.replace('.gpx', ''),
         textColor: '#000000',
         textSize: 12,
-        rotation: 0,
         offsetX: 0,  // offset dalam meter (geografis)
         offsetY: 0
       }
@@ -806,9 +737,10 @@ async function exportPdfFromLayers() {
                     });
                     
                     // ===== LABEL DI DALAM POLYGON (gunakan labelSettings) =====
+                    // ===== LABEL DI DALAM POLYGON (gunakan labelSettings) =====
                     if (meta.labelSettings && meta.labelSettings.show) {
                       const centroid = turf.centroid(f);
-  
+                    
                       // Gunakan offset dari labelSettings
                       const offsetX = meta.labelSettings.offsetX || 0;
                       const offsetY = meta.labelSettings.offsetY || 0;
@@ -824,7 +756,6 @@ async function exportPdfFromLayers() {
                       const blockName = meta.labelSettings.blockName || meta.name.replace('.gpx', '');
                       const labelTextColor = hexToRgb(meta.labelSettings.textColor || '#000000');
                       const labelSize = meta.labelSettings.textSize || 12;
-                      const labelRotation = meta.labelSettings.rotation || 0;
                       
                       // Text yang akan ditampilkan
                       const line1 = blockName;
@@ -832,9 +763,6 @@ async function exportPdfFromLayers() {
                       
                       const textWidth = Math.max(line1.length, line2.length) * (labelSize * 0.5);
                       const textHeight = labelSize * 2.5;
-                      
-                      // Save current state untuk rotasi
-                      const rad = (labelRotation * Math.PI) / 180;
                       
                       // Background kotak putih
                       page.drawRectangle({
@@ -861,8 +789,7 @@ async function exportPdfFromLayers() {
                         x: centX - (line1.length * labelSize * 0.25),
                         y: centY + labelSize * 0.3,
                         size: labelSize,
-                        color: rgb(labelTextColor.r, labelTextColor.g, labelTextColor.b),
-                        rotate: { angle: rad, type: 'radians' }
+                        color: rgb(labelTextColor.r, labelTextColor.g, labelTextColor.b)
                       });
                       
                       // Teks luas (baris 2)
@@ -870,8 +797,7 @@ async function exportPdfFromLayers() {
                         x: centX - (line2.length * labelSize * 0.25),
                         y: centY - labelSize * 0.7,
                         size: labelSize,
-                        color: rgb(labelTextColor.r, labelTextColor.g, labelTextColor.b),
-                        rotate: { angle: rad, type: 'radians' }
+                        color: rgb(labelTextColor.r, labelTextColor.g, labelTextColor.b)
                       });
                     }
                 });
