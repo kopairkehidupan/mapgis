@@ -651,12 +651,12 @@ el('#btnUpload').onclick = function(){
         geojson = convertLineToPolygonGeoJSON(geojson);
 
         var id = Date.now() + '-' + index + '-' + Math.floor(Math.random()*1000);
-        var randomColor = getRandomColor();
 
+        // ===== WARNA DEFAULT TETAP (TIDAK RANDOM) =====
         var metaDefaults = {
-          color: randomColor,
+          color: '#000000',        // Line hitam RGB(0,0,0)
           weight: 3,
-          fillColor: randomColor,
+          fillColor: '#ee00ff',    // Polygon pink RGB(238,0,255)
           fillOpacity: 0.4,
           dashArray: null,
           markerSymbol: 'circle'
