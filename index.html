@@ -29,7 +29,37 @@
     #map{flex:1}
     h3{margin:6px 0}
     input[type="file"]{width:100%}
-    #fileList{list-style:none;padding:0;margin:6px 0}
+    #fileList{
+      list-style:none;
+      padding:0;
+      margin:6px 0;
+      max-height: 520px;  /* ~5 cards × 104px per card */
+      overflow-y: auto;
+      overflow-x: hidden;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      background: #f9f9f9;
+      padding: 4px;
+    }
+    
+    /* Custom Scrollbar untuk File List */
+    #fileList::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    #fileList::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+    
+    #fileList::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+    
+    #fileList::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
     .file-card{border:1px solid #e0e0e0;padding:8px;margin-bottom:8px;background:#fff;border-radius:6px}
     .file-header{display:flex;align-items:center;gap:8px}
     .file-title{flex:1;font-weight:600;cursor:pointer}
