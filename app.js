@@ -1316,27 +1316,31 @@ async function exportPdfFromLayers() {
     
     const sidebarX = 570;
     const sidebarWidth = 240;
-    const paddingX = 12;
-    const paddingY = 12;
+    const centerX = sidebarX + (sidebarWidth / 2);
     
-    // Start dari top peta
     let yPos = mapOffsetY + mapHeight - 15;
     
-    // ========== KOTAK 1: TITLE & SUBTITLE ==========
+    // ========== KOTAK 1: TITLE & SUBTITLE (CENTER) ==========
     const box1Top = yPos;
+    yPos -= 18;
     
-    yPos -= paddingY;
-    page.drawText(pdfSettings.title || "PETA AREAL KEBUN", { 
-        x: sidebarX + paddingX, 
+    // Title (centered)
+    const titleText = pdfSettings.title || "PETA AREAL KEBUN";
+    const titleWidth = titleText.length * 8; // Estimasi lebar
+    page.drawText(titleText, { 
+        x: centerX - (titleWidth / 2), 
         y: yPos, 
         size: 14, 
         color: rgb(0, 0, 0) 
     });
     
-    yPos -= 22;
+    yPos -= 20;
+    
+    // Subtitle (centered)
     if (pdfSettings.subtitle && pdfSettings.subtitle.length > 0) {
+        const subtitleWidth = pdfSettings.subtitle.length * 6;
         page.drawText(pdfSettings.subtitle, { 
-            x: sidebarX + paddingX, 
+            x: centerX - (subtitleWidth / 2), 
             y: yPos, 
             size: 10, 
             color: rgb(0.4, 0.4, 0.4) 
@@ -1346,7 +1350,7 @@ async function exportPdfFromLayers() {
         yPos -= 5;
     }
     
-    const box1Bottom = yPos - paddingY;
+    const box1Bottom = yPos - 10;
     page.drawRectangle({
         x: sidebarX,
         y: box1Bottom,
@@ -1358,14 +1362,13 @@ async function exportPdfFromLayers() {
     
     yPos = box1Bottom - 15;
     
-    // ========== KOTAK 2: KOMPAS & SKALA ==========
+    // ========== KOTAK 2: KOMPAS & SKALA (CENTER) ==========
     const box2Top = yPos;
+    yPos -= 20;
     
-    yPos -= 15;
-    
-    // KOMPAS (kiri)
-    const compassCenterX = sidebarX + 40;
-    const compassCenterY = yPos - 25;
+    // KOMPAS (centered left)
+    const compassCenterX = sidebarX + 60;
+    const compassCenterY = yPos - 20;
     
     page.drawCircle({
         x: compassCenterX,
@@ -1375,7 +1378,6 @@ async function exportPdfFromLayers() {
         borderWidth: 1.5
     });
     
-    // Arrow kompas
     page.drawLine({
         start: { x: compassCenterX, y: compassCenterY },
         end: { x: compassCenterX, y: compassCenterY + 16 },
@@ -1396,17 +1398,20 @@ async function exportPdfFromLayers() {
     });
     page.drawText("U", { x: compassCenterX - 4, y: compassCenterY + 22, size: 11, color: rgb(0, 0, 0) });
     
-    // SKALA (kanan)
-    const scaleStartX = sidebarX + 115;
+    // SKALA (centered right)
+    const scaleCenterX = sidebarX + 165;
     const scaleY = compassCenterY;
-    const scaleLength = 70;
+    const scaleLength = 60;
     
     const realDist = turf.distance([minX, minY], [maxX, minY], {units: 'meters'});
     const pixelDist = mapWidth;
     const scaleRatio = Math.round((realDist / pixelDist) * scaleLength);
     
-    page.drawText("SKALA", { x: scaleStartX + 12, y: scaleY + 28, size: 10, color: rgb(0, 0, 0) });
+    // Label SKALA (centered above scale bar)
+    page.drawText("SKALA", { x: scaleCenterX - 18, y: scaleY + 26, size: 10, color: rgb(0, 0, 0) });
     
+    // Scale bar (centered)
+    const scaleStartX = scaleCenterX - (scaleLength / 2);
     page.drawLine({
         start: { x: scaleStartX, y: scaleY },
         end: { x: scaleStartX + scaleLength, y: scaleY },
@@ -1427,9 +1432,10 @@ async function exportPdfFromLayers() {
     });
     
     page.drawText("0", { x: scaleStartX - 3, y: scaleY - 16, size: 8, color: rgb(0, 0, 0) });
-    page.drawText(scaleRatio + " m", { x: scaleStartX + scaleLength - 20, y: scaleY - 16, size: 8, color: rgb(0, 0, 0) });
+    const scaleTextWidth = (scaleRatio + " m").length * 4;
+    page.drawText(scaleRatio + " m", { x: scaleStartX + scaleLength - scaleTextWidth, y: scaleY - 16, size: 8, color: rgb(0, 0, 0) });
     
-    yPos -= 60;
+    yPos -= 55;
     
     const box2Bottom = yPos;
     page.drawRectangle({
@@ -1443,13 +1449,15 @@ async function exportPdfFromLayers() {
     
     yPos -= 15;
     
-    // ========== KOTAK 3: KETERANGAN (LEGENDA) ==========
+    // ========== KOTAK 3: KETERANGAN (CENTER HEADER) ==========
     const box3Top = yPos;
+    yPos -= 15;
     
-    yPos -= paddingY;
-    page.drawText("KETERANGAN:", { x: sidebarX + paddingX, y: yPos, size: 11, color: rgb(0, 0, 0) });
+    // Header KETERANGAN (centered)
+    const headerWidth = "KETERANGAN:".length * 6.5;
+    page.drawText("KETERANGAN:", { x: centerX - headerWidth / 2, y: yPos, size: 11, color: rgb(0, 0, 0) });
     
-    yPos -= 20;
+    yPos -= 22;
     
     const fileIds = Object.keys(uploadedFiles);
     const totalFiles = fileIds.length;
@@ -1459,6 +1467,7 @@ async function exportPdfFromLayers() {
     const itemsPerColumn = useDoubleColumn ? Math.ceil(totalFiles / 2) : totalFiles;
     
     const legendStartY = yPos;
+    const paddingX = 12;
     
     fileIds.forEach((id, index) => {
         const meta = uploadedFiles[id];
@@ -1513,18 +1522,20 @@ async function exportPdfFromLayers() {
         });
     });
     
-    yPos = legendStartY - (itemsPerColumn * lineHeight) - 12;
+    yPos = legendStartY - (itemsPerColumn * lineHeight) - 15;
     
-    // Total Luas
+    // Total Luas (centered)
     const totalHa = (totalArea / 10000).toFixed(2);
-    page.drawText("Total Luas: " + totalHa + " Ha", { 
-        x: sidebarX + paddingX, 
+    const totalText = "Total Luas: " + totalHa + " Ha";
+    const totalWidth = totalText.length * 6;
+    page.drawText(totalText, { 
+        x: centerX - (totalWidth / 2), 
         y: yPos, 
         size: 10, 
         color: rgb(0, 0, 0)
     });
     
-    yPos -= paddingY + 5;
+    yPos -= 15;
     
     const box3Bottom = yPos;
     page.drawRectangle({
