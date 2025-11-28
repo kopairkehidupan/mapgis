@@ -138,7 +138,6 @@
         <div id="propNameRow" class="row">
           <label class="small">Nama:</label>
           <input id="propName" type="text" style="flex:1;padding:6px" />
-          <button id="propSaveName" class="btn-small">Simpan</button>
         </div>
 
         <div id="propStats" class="muted"></div>
@@ -180,11 +179,6 @@
           </select>
         </div>
 
-        <div style="margin-top:8px;display:flex;gap:8px">
-          <button id="applyStyle" class="btn-small" style="flex:1">Apply All Changes</button>
-          <button id="revertStyle" class="btn-small">Reset All</button>
-        </div>
-
         <!-- Tambahkan ini di index.html setelah baris tombol Reset, sebelum <hr> export buttons -->
         <hr>
         
@@ -205,6 +199,13 @@
         <div class="row">
           <button id="resetLabelPosition" class="btn-small" style="width:100%">Reset Posisi Label</button>
         </div>
+        
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button id="applyStyle" class="btn-small" style="flex:1; background:#4CAF50; color:white; border-color:#4CAF50; font-weight:600">Apply All Changes</button>
+          <button id="revertStyle" class="btn-small" style="background:#ff6b6b; color:white; border-color:#ff6b6b">Reset All</button>
+        </div>
+        
+        <hr>
 
         <hr>
 
