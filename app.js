@@ -1051,7 +1051,7 @@ async function exportPdfFromLayers() {
         const latLabel = lat.toFixed(4) + "°N";
         page.drawText(latLabel, { x: mapOffsetX - 45, y: y - 3, size: 8, color: rgb(0, 0, 0) });
     }
-
+    
     // --------- Helper Functions ---------
     
     // Helper: konversi hex color ke RGB
@@ -1063,7 +1063,7 @@ async function exportPdfFromLayers() {
             b: parseInt(result[3], 16) / 255
         } : { r: 0, g: 0.5, b: 1 };
     }
-
+    
     // Helper: gambar garis dengan dash pattern
     function drawDashedLine(page, x1, y1, x2, y2, dashPattern, thickness, color) {
         const dx = x2 - x1;
@@ -1103,7 +1103,7 @@ async function exportPdfFromLayers() {
             isDash = !isDash;
         }
     }
-
+    
     // --------- Gambar Polygon & Polyline ---------
     let totalArea = 0;
     
@@ -1126,7 +1126,7 @@ async function exportPdfFromLayers() {
             if (type === "Polygon") {
                 const area = turf.area(f);
                 totalArea += area;
-
+    
                 f.geometry.coordinates.forEach((ring, ringIdx) => {
                     if (ringIdx !== 0) return;
                     
@@ -1167,7 +1167,7 @@ async function exportPdfFromLayers() {
                     // Gambar border dengan support dash pattern
                     const dashPattern = meta.dashArray || '';
                     const isDashed = dashPattern.length > 0;
-
+    
                     if (isDashed) {
                         const dashValues = dashPattern.split(',').map(v => parseFloat(v.trim()));
                         
@@ -1221,7 +1221,7 @@ async function exportPdfFromLayers() {
                         const labelTextColor = hexToRgb(meta.labelSettings.textColor || '#000000');
                         
                         // ===== UKURAN FONT KECIL DAN SERAGAM =====
-                        const labelSize = 7; // Font size tetap 7pt untuk semua label
+                        const labelSize = 7;
                         
                         // Hitung ukuran polygon di layar (pixel)
                         const polyBounds = turf.bbox(f);
@@ -1232,7 +1232,7 @@ async function exportPdfFromLayers() {
                         const polyHeight = Math.abs(pMaxY - pMinY);
                         const polySize = Math.min(polyWidth, polyHeight);
                         
-                        // Skip polygon yang terlalu kecil (threshold lebih ketat)
+                        // Skip polygon yang terlalu kecil
                         if (polySize < 25) {
                             console.log('Polygon terlalu kecil untuk label:', blockName);
                             return;
@@ -1248,7 +1248,7 @@ async function exportPdfFromLayers() {
                             return;
                         }
                         
-                        // Background kotak putih (lebih compact)
+                        // Background kotak putih
                         page.drawRectangle({
                             x: centX - textWidth/2 - 3,
                             y: centY - textHeight/2,
@@ -1309,20 +1309,22 @@ async function exportPdfFromLayers() {
             }
         });
     });
-
-    // --------- HEADER ---------
-    // Gunakan judul dari pdfSettings
-    page.drawText(pdfSettings.title, { 
-        x: 300, y: 560, size: 20, color: rgb(0, 0, 0) 
-    });
     
-    page.drawText(pdfSettings.subtitle, { 
-        x: 320, y: 540, size: 12, color: rgb(0.3, 0.3, 0.3) 
-    });
-
-    // --------- KOMPAS ---------
-    const compassX = 520;
-    const compassY = 500;
+    // ========================================
+    // SIDEBAR KANAN: Title, Kompas, Skala, Legenda
+    // ========================================
+    
+    const sidebarX = 570;
+    let currentY = mapOffsetY + mapHeight - 10; // Mulai dari top peta
+    
+    // --------- BORDER KOTAK I: KOMPAS, SKALA, TITLE, SUBTITLE ---------
+    const box1StartY = currentY;
+    const box1Height = 150; // Tinggi kotak pertama
+    const box1Width = 240;
+    
+    // KOMPAS
+    const compassX = sidebarX + 30;
+    const compassY = currentY - 30;
     
     page.drawCircle({
         x: compassX,
@@ -1353,90 +1355,19 @@ async function exportPdfFromLayers() {
     });
     
     page.drawText("U", { x: compassX - 3, y: compassY + 17, size: 10, color: rgb(0, 0, 0) });
-
-    // --------- LEGENDA (dengan 2 kolom jika banyak) ---------
-    const legendX = 580;
-    let legendY = mapOffsetY + mapHeight - 20; // Sejajarkan dengan top border peta
-    const lineHeight = 15;
-    const maxLegendItems = 12;
     
-    page.drawText("KETERANGAN:", { x: legendX, y: legendY, size: 12, color: rgb(0, 0, 0) });
-    legendY -= 20;
+    currentY -= 55;
     
-    const fileIds = Object.keys(uploadedFiles);
-    const totalFiles = fileIds.length;
-    const useDoubleColumn = totalFiles > maxLegendItems;
-    const itemsPerColumn = useDoubleColumn ? Math.ceil(totalFiles / 2) : totalFiles;
-    
-    fileIds.forEach((id, index) => {
-        const meta = uploadedFiles[id];
-        
-        let currentX = legendX;
-        let currentY = legendY - (index % itemsPerColumn) * lineHeight;
-        
-        if (useDoubleColumn && index >= itemsPerColumn) {
-            currentX = legendX + 120;
-            currentY = legendY - ((index - itemsPerColumn) % itemsPerColumn) * lineHeight;
-        }
-        
-        const fillRgb = hexToRgb(meta.fillColor || meta.color || '#0077ff');
-        const strokeRgb = hexToRgb(meta.color || '#0077ff');
-        
-        page.drawRectangle({
-            x: currentX,
-            y: currentY - 8,
-            width: 15,
-            height: 8,
-            color: rgb(fillRgb.r, fillRgb.g, fillRgb.b),
-            borderColor: rgb(strokeRgb.r, strokeRgb.g, strokeRgb.b),
-            borderWidth: 1,
-            opacity: meta.fillOpacity || 0.4
-        });
-        
-        const layerGj = meta.group.toGeoJSON();
-        let layerArea = 0;
-        layerGj.features.forEach(f => {
-            if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
-                layerArea += turf.area(f);
-            }
-        });
-        
-        const areaHa = (layerArea / 10000).toFixed(2);
-        
-        let displayName = meta.name;
-        if (useDoubleColumn && displayName.length > 15) {
-            displayName = displayName.substring(0, 12) + '...';
-        } else if (!useDoubleColumn && displayName.length > 25) {
-            displayName = displayName.substring(0, 22) + '...';
-        }
-        
-        page.drawText(displayName + " - " + areaHa + " Ha", { 
-            x: currentX + 20, 
-            y: currentY - 7, 
-            size: 8,
-            color: rgb(0, 0, 0) 
-        });
-    });
-    
-    const legendBottomY = legendY - (itemsPerColumn * lineHeight) - 10;
-    
-    // --------- TOTAL LUAS ---------
-    const totalHa = (totalArea / 10000).toFixed(2);
-    page.drawText("Total Luas: " + totalHa + " Ha", { 
-        x: legendX, 
-        y: legendBottomY, 
-        size: 11, 
-        color: rgb(0, 0, 0) 
-    });
-
-    // --------- SKALA ---------
-    const scaleX = legendX;
-    const scaleY = legendBottomY - 40;
+    // SKALA
+    const scaleX = sidebarX + 15;
+    const scaleY = currentY;
     const scaleLength = 50;
     
     const realDist = turf.distance([minX, minY], [maxX, minY], {units: 'meters'});
     const pixelDist = mapWidth;
     const scaleRatio = Math.round((realDist / pixelDist) * scaleLength);
+    
+    page.drawText("SKALA", { x: scaleX, y: scaleY + 15, size: 9, color: rgb(0, 0, 0) });
     
     page.drawLine({
         start: { x: scaleX, y: scaleY },
@@ -1459,15 +1390,144 @@ async function exportPdfFromLayers() {
     
     page.drawText("0", { x: scaleX - 5, y: scaleY - 15, size: 8, color: rgb(0, 0, 0) });
     page.drawText(scaleRatio + " m", { x: scaleX + scaleLength - 15, y: scaleY - 15, size: 8, color: rgb(0, 0, 0) });
-    page.drawText("SKALA", { x: scaleX + 10, y: scaleY + 10, size: 9, color: rgb(0, 0, 0) });
-
+    
+    currentY -= 30;
+    
+    // TITLE
+    const titleText = pdfSettings.title || "PETA AREAL KEBUN";
+    page.drawText(titleText, { 
+        x: sidebarX + 10, 
+        y: currentY, 
+        size: 14, 
+        color: rgb(0, 0, 0) 
+    });
+    
+    currentY -= 20;
+    
+    // SUBTITLE
+    const subtitleText = pdfSettings.subtitle || "";
+    if (subtitleText.length > 0) {
+        page.drawText(subtitleText, { 
+            x: sidebarX + 10, 
+            y: currentY, 
+            size: 10, 
+            color: rgb(0.3, 0.3, 0.3) 
+        });
+        currentY -= 15;
+    } else {
+        currentY -= 5;
+    }
+    
+    // Gambar border kotak I
+    const box1BottomY = currentY - 5;
+    page.drawRectangle({
+        x: sidebarX,
+        y: box1BottomY,
+        width: box1Width,
+        height: box1StartY - box1BottomY,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1.5
+    });
+    
+    currentY = box1BottomY - 15;
+    
+    // --------- BORDER KOTAK II: KETERANGAN (LEGENDA) ---------
+    const box2StartY = currentY;
+    
+    page.drawText("KETERANGAN:", { x: sidebarX + 10, y: currentY, size: 12, color: rgb(0, 0, 0) });
+    currentY -= 20;
+    
+    const lineHeight = 15;
+    const maxLegendItems = 12;
+    
+    const fileIds = Object.keys(uploadedFiles);
+    const totalFiles = fileIds.length;
+    const useDoubleColumn = totalFiles > maxLegendItems;
+    const itemsPerColumn = useDoubleColumn ? Math.ceil(totalFiles / 2) : totalFiles;
+    
+    const legendStartY = currentY;
+    
+    fileIds.forEach((id, index) => {
+        const meta = uploadedFiles[id];
+        
+        let currentX = sidebarX + 10;
+        let itemY = legendStartY - (index % itemsPerColumn) * lineHeight;
+        
+        if (useDoubleColumn && index >= itemsPerColumn) {
+            currentX = sidebarX + 125;
+            itemY = legendStartY - ((index - itemsPerColumn) % itemsPerColumn) * lineHeight;
+        }
+        
+        const fillRgb = hexToRgb(meta.fillColor || meta.color || '#0077ff');
+        const strokeRgb = hexToRgb(meta.color || '#0077ff');
+        
+        page.drawRectangle({
+            x: currentX,
+            y: itemY - 8,
+            width: 15,
+            height: 8,
+            color: rgb(fillRgb.r, fillRgb.g, fillRgb.b),
+            borderColor: rgb(strokeRgb.r, strokeRgb.g, strokeRgb.b),
+            borderWidth: 1,
+            opacity: meta.fillOpacity || 0.4
+        });
+        
+        const layerGj = meta.group.toGeoJSON();
+        let layerArea = 0;
+        layerGj.features.forEach(f => {
+            if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
+                layerArea += turf.area(f);
+            }
+        });
+        
+        const areaHa = (layerArea / 10000).toFixed(2);
+        
+        let displayName = meta.name;
+        if (useDoubleColumn && displayName.length > 12) {
+            displayName = displayName.substring(0, 10) + '..';
+        } else if (!useDoubleColumn && displayName.length > 22) {
+            displayName = displayName.substring(0, 19) + '...';
+        }
+        
+        page.drawText(displayName + " - " + areaHa + " Ha", { 
+            x: currentX + 20, 
+            y: itemY - 7, 
+            size: 7,
+            color: rgb(0, 0, 0) 
+        });
+    });
+    
+    currentY = legendStartY - (itemsPerColumn * lineHeight) - 10;
+    
+    // TOTAL LUAS
+    const totalHa = (totalArea / 10000).toFixed(2);
+    page.drawText("Total Luas: " + totalHa + " Ha", { 
+        x: sidebarX + 10, 
+        y: currentY, 
+        size: 11, 
+        color: rgb(0, 0, 0) 
+    });
+    
+    currentY -= 10;
+    
+    // Gambar border kotak II
+    const box2BottomY = currentY;
+    page.drawRectangle({
+        x: sidebarX,
+        y: box2BottomY,
+        width: box1Width,
+        height: box2StartY - box2BottomY,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1.5
+    });
+    
     // --------- FOOTER ---------
     const now = new Date();
     const dateStr = now.toLocaleDateString('id-ID');
     page.drawText("Dicetak: " + dateStr, { 
         x: 50, y: 20, size: 8, color: rgb(0.4, 0.4, 0.4) 
     });
-
+    
     const pdfBytes = await pdfDoc.save();
     saveAs(new Blob([pdfBytes]), "peta_areal.pdf");
 }
