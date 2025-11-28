@@ -594,46 +594,6 @@ el('#styleFillOpacity').oninput = function(){ el('#fillOpacityVal').innerText = 
 // Label controls live display
 el('#labelTextSize').oninput = function(){ el('#labelSizeVal').innerText = this.value; };
 
-// Apply label settings
-el('#applyLabel').onclick = function(){
-  if(!lastSelectedId) return alert('Pilih layer dulu.');
-  var meta = uploadedFiles[lastSelectedId];
-  
-  // Preserve offset jika sudah ada
-  var existingOffsetX = meta.labelSettings.offsetX || 0;
-  var existingOffsetY = meta.labelSettings.offsetY || 0;
-  
-  meta.labelSettings = {
-    show: el('#labelShow').checked,
-    blockName: el('#labelBlockName').value.trim() || meta.name.replace('.gpx', ''),
-    textColor: el('#labelTextColor').value,
-    textSize: parseInt(el('#labelTextSize').value),
-    offsetX: existingOffsetX,
-    offsetY: existingOffsetY
-    // HAPUS rotation
-  };
-  
-  updateMapLabels(lastSelectedId);
-  alert('Label settings diterapkan.');
-};
-
-// Reset label settings
-el('#revertLabel').onclick = function(){
-  if(!lastSelectedId) return;
-  var meta = uploadedFiles[lastSelectedId];
-  meta.labelSettings = {
-    show: true,
-    blockName: meta.name.replace('.gpx', ''),
-    textColor: '#000000',
-    textSize: 12,
-    offsetX: meta.labelSettings.offsetX || 0,  // Keep position
-    offsetY: meta.labelSettings.offsetY || 0
-    // HAPUS rotation
-  };
-  openProperties(lastSelectedId);
-  updateMapLabels(lastSelectedId);
-};
-
 // Reset label position
 el('#resetLabelPosition').onclick = function(){
   if(!lastSelectedId) return;
@@ -644,10 +604,12 @@ el('#resetLabelPosition').onclick = function(){
   alert('Posisi label direset ke tengah polygon.');
 };
 
-// apply style to lastSelectedId
+// apply ALL (style + label) to lastSelectedId
 el('#applyStyle').onclick = function(){
   if(!lastSelectedId) return alert('Pilih layer dulu.');
   var meta = uploadedFiles[lastSelectedId];
+  
+  // ===== APPLY STYLE =====
   meta.color = el('#styleStrokeColor').value;
   meta.weight = parseInt(el('#styleStrokeWidth').value);
   meta.fillColor = el('#styleFillColor').value;
@@ -665,15 +627,54 @@ el('#applyStyle').onclick = function(){
       layer.setStyle({ color: meta.color, fillColor: meta.fillColor });
     }
   });
-  alert('Style diterapkan.');
+  
+  // ===== APPLY LABEL =====
+  // Preserve offset jika sudah ada
+  var existingOffsetX = meta.labelSettings.offsetX || 0;
+  var existingOffsetY = meta.labelSettings.offsetY || 0;
+  
+  meta.labelSettings = {
+    show: el('#labelShow').checked,
+    blockName: el('#labelBlockName').value.trim() || meta.name.replace('.gpx', ''),
+    textColor: el('#labelTextColor').value,
+    textSize: parseInt(el('#labelTextSize').value),
+    offsetX: existingOffsetX,
+    offsetY: existingOffsetY
+  };
+  
+  // Update labels on map
+  updateMapLabels(lastSelectedId);
+  
+  alert('Semua perubahan diterapkan!');
 };
 
-// revert style to defaults
+// revert ALL (style + label) to defaults
 el('#revertStyle').onclick = function(){
   if(!lastSelectedId) return;
   var meta = uploadedFiles[lastSelectedId];
-  meta.color = '#0077ff'; meta.weight = 3; meta.fillColor = meta.color; meta.fillOpacity = 0.4; meta.dashArray = null; meta.markerSymbol = 'circle';
+  
+  // ===== RESET STYLE =====
+  meta.color = '#000000';
+  meta.weight = 3;
+  meta.fillColor = '#ee00ff';
+  meta.fillOpacity = 0.4;
+  meta.dashArray = null;
+  meta.markerSymbol = 'circle';
+  
+  // ===== RESET LABEL =====
+  meta.labelSettings = {
+    show: true,
+    blockName: meta.name.replace('.gpx', ''),
+    textColor: '#000000',
+    textSize: 12,
+    offsetX: meta.labelSettings.offsetX || 0,  // Keep position
+    offsetY: meta.labelSettings.offsetY || 0
+  };
+  
+  // Refresh properties panel
   openProperties(lastSelectedId);
+  
+  // Apply changes
   el('#applyStyle').click();
 };
 
