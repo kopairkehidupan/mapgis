@@ -1398,42 +1398,32 @@ async function exportPdfFromLayers() {
     });
     page.drawText("U", { x: compassCenterX - 4, y: compassCenterY + 22, size: 11, color: rgb(0, 0, 0) });
     
-    // SKALA (centered right)
+    // SKALA (text only, centered)
     const scaleCenterX = sidebarX + 165;
     const scaleY = compassCenterY;
-    const scaleLength = 60;
     
+    // Hitung skala rasio
     const realDist = turf.distance([minX, minY], [maxX, minY], {units: 'meters'});
     const pixelDist = mapWidth;
-    const scaleRatio = Math.round((realDist / pixelDist) * scaleLength);
     
-    // Label SKALA (centered above scale bar)
-    page.drawText("SKALA", { x: scaleCenterX - 18, y: scaleY + 26, size: 10, color: rgb(0, 0, 0) });
+    // Konversi ke cm
+    const realDistCm = realDist * 100; // meter ke cm
+    const pdfScaleCm = pixelDist * 2.54 / 72; // pixels ke cm (asumsi 72 DPI)
     
-    // Scale bar (centered)
-    const scaleStartX = scaleCenterX - (scaleLength / 2);
-    page.drawLine({
-        start: { x: scaleStartX, y: scaleY },
-        end: { x: scaleStartX + scaleLength, y: scaleY },
-        thickness: 2.5,
-        color: rgb(0, 0, 0)
-    });
-    page.drawLine({
-        start: { x: scaleStartX, y: scaleY - 6 },
-        end: { x: scaleStartX, y: scaleY + 6 },
-        thickness: 2.5,
-        color: rgb(0, 0, 0)
-    });
-    page.drawLine({
-        start: { x: scaleStartX + scaleLength, y: scaleY - 6 },
-        end: { x: scaleStartX + scaleLength, y: scaleY + 6 },
-        thickness: 2.5,
-        color: rgb(0, 0, 0)
-    });
+    // Hitung rasio skala (1 cm di peta = X cm di lapangan)
+    const scaleRatio = Math.round(realDistCm / pdfScaleCm);
     
-    page.drawText("0", { x: scaleStartX - 3, y: scaleY - 16, size: 8, color: rgb(0, 0, 0) });
-    const scaleTextWidth = (scaleRatio + " m").length * 4;
-    page.drawText(scaleRatio + " m", { x: scaleStartX + scaleLength - scaleTextWidth, y: scaleY - 16, size: 8, color: rgb(0, 0, 0) });
+    // Format dengan pemisah ribuan
+    const scaleText = "Skala 1 : " + scaleRatio.toLocaleString('id-ID');
+    
+    // Label SKALA (centered, line 1)
+    const scaleTextWidth = scaleText.length * 5;
+    page.drawText(scaleText, { 
+        x: scaleCenterX - (scaleTextWidth / 2), 
+        y: scaleY + 5, 
+        size: 10, 
+        color: rgb(0, 0, 0) 
+    });
     
     yPos -= 55;
     
