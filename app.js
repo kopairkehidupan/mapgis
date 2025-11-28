@@ -942,7 +942,7 @@ document.getElementById('btnConfirmPdf').onclick = function() {
   const subtitleInput = document.getElementById('pdfSubtitle');
   
   pdfSettings.title = titleInput.value.trim() || "PETA AREAL KEBUN";
-  pdfSettings.subtitle = subtitleInput.value.trim() || "HASIL PENGOLAHAN GPX";
+  pdfSettings.subtitle = subtitleInput.value.trim() || "";
   
   // Sembunyikan modal
   hidePdfModal();
