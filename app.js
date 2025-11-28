@@ -1340,7 +1340,8 @@ async function exportPdfFromLayers() {
     const sidebarWidth = 240;
     const centerX = sidebarX + (sidebarWidth / 2);
     
-    let yPos = mapOffsetY + mapHeight - 15;
+    // MULAI DARI POSISI YANG SAMA DENGAN TOP BORDER PETA
+    let yPos = mapOffsetY + mapHeight; // Hapus pengurangan -15
     
     // ========== KOTAK 1: TITLE & SUBTITLE (CENTER) ==========
     const box1Top = yPos;
