@@ -1433,7 +1433,23 @@ async function exportPdfFromLayers() {
     const pdfScaleCm = pixelDist * 2.54 / 72; // pixels ke cm (asumsi 72 DPI)
     
     // Hitung rasio skala (1 cm di peta = X cm di lapangan)
-    const scaleRatio = Math.round(realDistCm / pdfScaleCm);
+    let scaleRatio = Math.round(realDistCm / pdfScaleCm);
+    
+    // PEMBULATAN KE RIBUAN TERDEKAT
+    // Jika >= 500 bulatkan ke atas, jika < 500 bulatkan ke bawah
+    const remainder = scaleRatio % 1000;
+    // PEMBULATAN KE RIBUAN TERDEKAT
+    if (scaleRatio < 1000) {
+        // Jika skala < 1000, tetap gunakan nilai asli tanpa pembulatan ribuan
+        scaleRatio = Math.round(scaleRatio / 100) * 100; // Bulatkan ke ratusan
+    } else {
+        const remainder = scaleRatio % 1000;
+        if (remainder >= 500) {
+            scaleRatio = Math.ceil(scaleRatio / 1000) * 1000;
+        } else {
+            scaleRatio = Math.floor(scaleRatio / 1000) * 1000;
+        }
+    }
     
     // Format dengan pemisah ribuan
     const scaleText = "Skala 1 : " + scaleRatio.toLocaleString('id-ID');
