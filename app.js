@@ -940,10 +940,20 @@ document.getElementById('btnConfirmPdf').onclick = function() {
 };
 
 // Event handler untuk Enter key di input
+// Auto UPPERCASE untuk Title
+document.getElementById('pdfTitle').addEventListener('input', function(e) {
+  this.value = this.value.toUpperCase();
+});
+
 document.getElementById('pdfTitle').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
     document.getElementById('pdfSubtitle').focus();
   }
+});
+
+// Auto UPPERCASE untuk Subtitle
+document.getElementById('pdfSubtitle').addEventListener('input', function(e) {
+  this.value = this.value.toUpperCase();
 });
 
 document.getElementById('pdfSubtitle').addEventListener('keydown', function(e) {
@@ -1548,7 +1558,28 @@ async function exportPdfFromLayers() {
     });
     
     const pdfBytes = await pdfDoc.save();
-    saveAs(new Blob([pdfBytes]), "peta_areal.pdf");
+
+    // Generate nama file dari title + subtitle
+    let filename = "";
+    
+    if (pdfSettings.title) {
+        filename += pdfSettings.title.replace(/ /g, '_');
+    }
+    
+    if (pdfSettings.subtitle && pdfSettings.subtitle.length > 0) {
+        if (filename.length > 0) filename += "_";
+        filename += pdfSettings.subtitle.replace(/ /g, '_');
+    }
+    
+    // Fallback jika kosong
+    if (filename.length === 0) {
+        filename = "PETA_AREAL";
+    }
+    
+    // Tambahkan ekstensi .pdf
+    filename += ".pdf";
+    
+    saveAs(new Blob([pdfBytes]), filename);
 }
 
 // End of app.js
