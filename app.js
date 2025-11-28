@@ -879,7 +879,7 @@ function convertLineToPolygonGeoJSON(gj) {
 // Variable untuk menyimpan judul PDF
 var pdfSettings = {
   title: "PETA AREAL KEBUN",
-  subtitle: "HASIL PENGOLAHAN GPX"
+  subtitle: ""
 };
 
 // Event handler untuk tombol Print PDF
