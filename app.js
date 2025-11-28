@@ -1315,94 +1315,22 @@ async function exportPdfFromLayers() {
     // ========================================
     
     const sidebarX = 570;
-    let currentY = mapOffsetY + mapHeight - 10; // Mulai dari top peta
+    const sidebarWidth = 240;
+    let currentY = mapOffsetY + mapHeight - 20; // Mulai dari top peta
     
-    // --------- BORDER KOTAK I: KOMPAS, SKALA, TITLE, SUBTITLE ---------
-    const box1StartY = currentY;
-    const box1Height = 150; // Tinggi kotak pertama
-    const box1Width = 240;
-    
-    // KOMPAS
-    const compassX = sidebarX + 30;
-    const compassY = currentY - 30;
-    
-    page.drawCircle({
-        x: compassX,
-        y: compassY,
-        size: 15,
-        borderColor: rgb(0, 0, 0),
-        borderWidth: 1.5
-    });
-    
-    page.drawLine({
-        start: { x: compassX, y: compassY },
-        end: { x: compassX, y: compassY + 12 },
-        thickness: 2,
-        color: rgb(0, 0, 0)
-    });
-    
-    page.drawLine({
-        start: { x: compassX, y: compassY + 12 },
-        end: { x: compassX - 3, y: compassY + 8 },
-        thickness: 2,
-        color: rgb(0, 0, 0)
-    });
-    page.drawLine({
-        start: { x: compassX, y: compassY + 12 },
-        end: { x: compassX + 3, y: compassY + 8 },
-        thickness: 2,
-        color: rgb(0, 0, 0)
-    });
-    
-    page.drawText("U", { x: compassX - 3, y: compassY + 17, size: 10, color: rgb(0, 0, 0) });
-    
-    currentY -= 55;
-    
-    // SKALA
-    const scaleX = sidebarX + 15;
-    const scaleY = currentY;
-    const scaleLength = 50;
-    
-    const realDist = turf.distance([minX, minY], [maxX, minY], {units: 'meters'});
-    const pixelDist = mapWidth;
-    const scaleRatio = Math.round((realDist / pixelDist) * scaleLength);
-    
-    page.drawText("SKALA", { x: scaleX, y: scaleY + 15, size: 9, color: rgb(0, 0, 0) });
-    
-    page.drawLine({
-        start: { x: scaleX, y: scaleY },
-        end: { x: scaleX + scaleLength, y: scaleY },
-        thickness: 2,
-        color: rgb(0, 0, 0)
-    });
-    page.drawLine({
-        start: { x: scaleX, y: scaleY - 5 },
-        end: { x: scaleX, y: scaleY + 5 },
-        thickness: 2,
-        color: rgb(0, 0, 0)
-    });
-    page.drawLine({
-        start: { x: scaleX + scaleLength, y: scaleY - 5 },
-        end: { x: scaleX + scaleLength, y: scaleY + 5 },
-        thickness: 2,
-        color: rgb(0, 0, 0)
-    });
-    
-    page.drawText("0", { x: scaleX - 5, y: scaleY - 15, size: 8, color: rgb(0, 0, 0) });
-    page.drawText(scaleRatio + " m", { x: scaleX + scaleLength - 15, y: scaleY - 15, size: 8, color: rgb(0, 0, 0) });
-    
-    currentY -= 30;
+    // --------- KOTAK I: TITLE & SUBTITLE ---------
+    const titleBoxStartY = currentY;
     
     // TITLE
     const titleText = pdfSettings.title || "PETA AREAL KEBUN";
     page.drawText(titleText, { 
         x: sidebarX + 10, 
-        y: currentY, 
+        y: currentY - 15, 
         size: 14, 
         color: rgb(0, 0, 0) 
     });
     
-    currentY -= 20;
+    currentY -= 35;
     
     // SUBTITLE
     const subtitleText = pdfSettings.subtitle || "";
@@ -1413,32 +1341,117 @@ async function exportPdfFromLayers() {
             size: 10, 
             color: rgb(0.3, 0.3, 0.3) 
         });
-        currentY -= 15;
+        currentY -= 20;
     } else {
-        currentY -= 5;
+        currentY -= 10;
     }
     
-    // Gambar border kotak I
-    const box1BottomY = currentY - 5;
+    // Border Kotak I
+    const titleBoxBottomY = currentY;
     page.drawRectangle({
         x: sidebarX,
-        y: box1BottomY,
-        width: box1Width,
-        height: box1StartY - box1BottomY,
+        y: titleBoxBottomY,
+        width: sidebarWidth,
+        height: titleBoxStartY - titleBoxBottomY,
         borderColor: rgb(0, 0, 0),
         borderWidth: 1.5
     });
     
-    currentY = box1BottomY - 15;
-    
-    // --------- BORDER KOTAK II: KETERANGAN (LEGENDA) ---------
-    const box2StartY = currentY;
-    
-    page.drawText("KETERANGAN:", { x: sidebarX + 10, y: currentY, size: 12, color: rgb(0, 0, 0) });
     currentY -= 20;
     
-    const lineHeight = 15;
-    const maxLegendItems = 12;
+    // --------- KOTAK II: KOMPAS & SKALA ---------
+    const compassBoxStartY = currentY;
+    
+    // KOMPAS
+    const compassX = sidebarX + 35;
+    const compassY = currentY - 35;
+    
+    page.drawCircle({
+        x: compassX,
+        y: compassY,
+        size: 18,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1.5
+    });
+    
+    page.drawLine({
+        start: { x: compassX, y: compassY },
+        end: { x: compassX, y: compassY + 15 },
+        thickness: 2,
+        color: rgb(0, 0, 0)
+    });
+    
+    page.drawLine({
+        start: { x: compassX, y: compassY + 15 },
+        end: { x: compassX - 4, y: compassY + 10 },
+        thickness: 2,
+        color: rgb(0, 0, 0)
+    });
+    page.drawLine({
+        start: { x: compassX, y: compassY + 15 },
+        end: { x: compassX + 4, y: compassY + 10 },
+        thickness: 2,
+        color: rgb(0, 0, 0)
+    });
+    
+    page.drawText("U", { x: compassX - 4, y: compassY + 20, size: 11, color: rgb(0, 0, 0) });
+    
+    // SKALA
+    const scaleX = sidebarX + 120;
+    const scaleY = compassY - 5;
+    const scaleLength = 60;
+    
+    const realDist = turf.distance([minX, minY], [maxX, minY], {units: 'meters'});
+    const pixelDist = mapWidth;
+    const scaleRatio = Math.round((realDist / pixelDist) * scaleLength);
+    
+    page.drawText("SKALA", { x: scaleX + 5, y: scaleY + 20, size: 10, color: rgb(0, 0, 0) });
+    
+    page.drawLine({
+        start: { x: scaleX, y: scaleY },
+        end: { x: scaleX + scaleLength, y: scaleY },
+        thickness: 2.5,
+        color: rgb(0, 0, 0)
+    });
+    page.drawLine({
+        start: { x: scaleX, y: scaleY - 6 },
+        end: { x: scaleX, y: scaleY + 6 },
+        thickness: 2.5,
+        color: rgb(0, 0, 0)
+    });
+    page.drawLine({
+        start: { x: scaleX + scaleLength, y: scaleY - 6 },
+        end: { x: scaleX + scaleLength, y: scaleY + 6 },
+        thickness: 2.5,
+        color: rgb(0, 0, 0)
+    });
+    
+    page.drawText("0", { x: scaleX - 5, y: scaleY - 18, size: 9, color: rgb(0, 0, 0) });
+    page.drawText(scaleRatio + " m", { x: scaleX + scaleLength - 18, y: scaleY - 18, size: 9, color: rgb(0, 0, 0) });
+    
+    currentY = compassY - 30;
+    
+    // Border Kotak II
+    const compassBoxBottomY = currentY;
+    page.drawRectangle({
+        x: sidebarX,
+        y: compassBoxBottomY,
+        width: sidebarWidth,
+        height: compassBoxStartY - compassBoxBottomY,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1.5
+    });
+    
+    currentY -= 20;
+    
+    // --------- KOTAK III: KETERANGAN (LEGENDA) ---------
+    const legendBoxStartY = currentY;
+    
+    page.drawText("KETERANGAN:", { x: sidebarX + 10, y: currentY - 12, size: 12, color: rgb(0, 0, 0) });
+    currentY -= 30;
+    
+    const lineHeight = 14;
+    const maxLegendItems = 15;
     
     const fileIds = Object.keys(uploadedFiles);
     const totalFiles = fileIds.length;
@@ -1461,10 +1474,11 @@ async function exportPdfFromLayers() {
         const fillRgb = hexToRgb(meta.fillColor || meta.color || '#0077ff');
         const strokeRgb = hexToRgb(meta.color || '#0077ff');
         
+        // Color box
         page.drawRectangle({
             x: currentX,
-            y: itemY - 8,
-            width: 15,
+            y: itemY - 7,
+            width: 14,
             height: 8,
             color: rgb(fillRgb.r, fillRgb.g, fillRgb.b),
             borderColor: rgb(strokeRgb.r, strokeRgb.g, strokeRgb.b),
@@ -1472,6 +1486,7 @@ async function exportPdfFromLayers() {
             opacity: meta.fillOpacity || 0.4
         });
         
+        // Calculate area
         const layerGj = meta.group.toGeoJSON();
         let layerArea = 0;
         layerGj.features.forEach(f => {
@@ -1482,22 +1497,24 @@ async function exportPdfFromLayers() {
         
         const areaHa = (layerArea / 10000).toFixed(2);
         
-        let displayName = meta.name;
-        if (useDoubleColumn && displayName.length > 12) {
-            displayName = displayName.substring(0, 10) + '..';
-        } else if (!useDoubleColumn && displayName.length > 22) {
-            displayName = displayName.substring(0, 19) + '...';
+        // Truncate name if too long
+        let displayName = meta.name.replace('.gpx', '');
+        if (useDoubleColumn && displayName.length > 11) {
+            displayName = displayName.substring(0, 9) + '..';
+        } else if (!useDoubleColumn && displayName.length > 20) {
+            displayName = displayName.substring(0, 18) + '..';
         }
         
+        // Text label
         page.drawText(displayName + " - " + areaHa + " Ha", { 
-            x: currentX + 20, 
-            y: itemY - 7, 
+            x: currentX + 18, 
+            y: itemY - 6, 
             size: 7,
             color: rgb(0, 0, 0) 
         });
     });
     
-    currentY = legendStartY - (itemsPerColumn * lineHeight) - 10;
+    currentY = legendStartY - (itemsPerColumn * lineHeight) - 15;
     
     // TOTAL LUAS
     const totalHa = (totalArea / 10000).toFixed(2);
@@ -1505,18 +1522,19 @@ async function exportPdfFromLayers() {
         x: sidebarX + 10, 
         y: currentY, 
         size: 11, 
-        color: rgb(0, 0, 0) 
+        color: rgb(0, 0, 0),
+        weight: 600
     });
     
-    currentY -= 10;
+    currentY -= 15;
     
-    // Gambar border kotak II
-    const box2BottomY = currentY;
+    // Border Kotak III
+    const legendBoxBottomY = currentY;
     page.drawRectangle({
         x: sidebarX,
-        y: box2BottomY,
-        width: box1Width,
-        height: box2StartY - box2BottomY,
+        y: legendBoxBottomY,
+        width: sidebarWidth,
+        height: legendBoxStartY - legendBoxBottomY,
         borderColor: rgb(0, 0, 0),
         borderWidth: 1.5
     });
