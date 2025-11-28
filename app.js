@@ -1316,158 +1316,158 @@ async function exportPdfFromLayers() {
     
     const sidebarX = 570;
     const sidebarWidth = 240;
-    let currentY = mapOffsetY + mapHeight - 20; // Mulai dari top peta
+    const paddingX = 12;
+    const paddingY = 12;
     
-    // --------- KOTAK I: TITLE & SUBTITLE ---------
-    const titleBoxStartY = currentY;
+    // Start dari top peta
+    let yPos = mapOffsetY + mapHeight - 15;
     
-    // TITLE
-    const titleText = pdfSettings.title || "PETA AREAL KEBUN";
-    page.drawText(titleText, { 
-        x: sidebarX + 10, 
-        y: currentY - 15, 
+    // ========== KOTAK 1: TITLE & SUBTITLE ==========
+    const box1Top = yPos;
+    
+    yPos -= paddingY;
+    page.drawText(pdfSettings.title || "PETA AREAL KEBUN", { 
+        x: sidebarX + paddingX, 
+        y: yPos, 
         size: 14, 
         color: rgb(0, 0, 0) 
     });
     
-    currentY -= 35;
-    
-    // SUBTITLE
-    const subtitleText = pdfSettings.subtitle || "";
-    if (subtitleText.length > 0) {
-        page.drawText(subtitleText, { 
-            x: sidebarX + 10, 
-            y: currentY, 
+    yPos -= 22;
+    if (pdfSettings.subtitle && pdfSettings.subtitle.length > 0) {
+        page.drawText(pdfSettings.subtitle, { 
+            x: sidebarX + paddingX, 
+            y: yPos, 
             size: 10, 
-            color: rgb(0.3, 0.3, 0.3) 
+            color: rgb(0.4, 0.4, 0.4) 
         });
-        currentY -= 20;
+        yPos -= 15;
     } else {
-        currentY -= 10;
+        yPos -= 5;
     }
     
-    // Border Kotak I
-    const titleBoxBottomY = currentY;
+    const box1Bottom = yPos - paddingY;
     page.drawRectangle({
         x: sidebarX,
-        y: titleBoxBottomY,
+        y: box1Bottom,
         width: sidebarWidth,
-        height: titleBoxStartY - titleBoxBottomY,
+        height: box1Top - box1Bottom,
         borderColor: rgb(0, 0, 0),
         borderWidth: 1.5
     });
     
-    currentY -= 20;
+    yPos = box1Bottom - 15;
     
-    // --------- KOTAK II: KOMPAS & SKALA ---------
-    const compassBoxStartY = currentY;
+    // ========== KOTAK 2: KOMPAS & SKALA ==========
+    const box2Top = yPos;
     
-    // KOMPAS
-    const compassX = sidebarX + 35;
-    const compassY = currentY - 35;
+    yPos -= 15;
+    
+    // KOMPAS (kiri)
+    const compassCenterX = sidebarX + 40;
+    const compassCenterY = yPos - 25;
     
     page.drawCircle({
-        x: compassX,
-        y: compassY,
-        size: 18,
+        x: compassCenterX,
+        y: compassCenterY,
+        size: 20,
         borderColor: rgb(0, 0, 0),
         borderWidth: 1.5
     });
     
+    // Arrow kompas
     page.drawLine({
-        start: { x: compassX, y: compassY },
-        end: { x: compassX, y: compassY + 15 },
-        thickness: 2,
-        color: rgb(0, 0, 0)
-    });
-    
-    page.drawLine({
-        start: { x: compassX, y: compassY + 15 },
-        end: { x: compassX - 4, y: compassY + 10 },
-        thickness: 2,
+        start: { x: compassCenterX, y: compassCenterY },
+        end: { x: compassCenterX, y: compassCenterY + 16 },
+        thickness: 2.5,
         color: rgb(0, 0, 0)
     });
     page.drawLine({
-        start: { x: compassX, y: compassY + 15 },
-        end: { x: compassX + 4, y: compassY + 10 },
-        thickness: 2,
+        start: { x: compassCenterX, y: compassCenterY + 16 },
+        end: { x: compassCenterX - 5, y: compassCenterY + 11 },
+        thickness: 2.5,
         color: rgb(0, 0, 0)
     });
+    page.drawLine({
+        start: { x: compassCenterX, y: compassCenterY + 16 },
+        end: { x: compassCenterX + 5, y: compassCenterY + 11 },
+        thickness: 2.5,
+        color: rgb(0, 0, 0)
+    });
+    page.drawText("U", { x: compassCenterX - 4, y: compassCenterY + 22, size: 11, color: rgb(0, 0, 0) });
     
-    page.drawText("U", { x: compassX - 4, y: compassY + 20, size: 11, color: rgb(0, 0, 0) });
-    
-    // SKALA
-    const scaleX = sidebarX + 120;
-    const scaleY = compassY - 5;
-    const scaleLength = 60;
+    // SKALA (kanan)
+    const scaleStartX = sidebarX + 115;
+    const scaleY = compassCenterY;
+    const scaleLength = 70;
     
     const realDist = turf.distance([minX, minY], [maxX, minY], {units: 'meters'});
     const pixelDist = mapWidth;
     const scaleRatio = Math.round((realDist / pixelDist) * scaleLength);
     
-    page.drawText("SKALA", { x: scaleX + 5, y: scaleY + 20, size: 10, color: rgb(0, 0, 0) });
+    page.drawText("SKALA", { x: scaleStartX + 12, y: scaleY + 28, size: 10, color: rgb(0, 0, 0) });
     
     page.drawLine({
-        start: { x: scaleX, y: scaleY },
-        end: { x: scaleX + scaleLength, y: scaleY },
+        start: { x: scaleStartX, y: scaleY },
+        end: { x: scaleStartX + scaleLength, y: scaleY },
         thickness: 2.5,
         color: rgb(0, 0, 0)
     });
     page.drawLine({
-        start: { x: scaleX, y: scaleY - 6 },
-        end: { x: scaleX, y: scaleY + 6 },
+        start: { x: scaleStartX, y: scaleY - 6 },
+        end: { x: scaleStartX, y: scaleY + 6 },
         thickness: 2.5,
         color: rgb(0, 0, 0)
     });
     page.drawLine({
-        start: { x: scaleX + scaleLength, y: scaleY - 6 },
-        end: { x: scaleX + scaleLength, y: scaleY + 6 },
+        start: { x: scaleStartX + scaleLength, y: scaleY - 6 },
+        end: { x: scaleStartX + scaleLength, y: scaleY + 6 },
         thickness: 2.5,
         color: rgb(0, 0, 0)
     });
     
-    page.drawText("0", { x: scaleX - 5, y: scaleY - 18, size: 9, color: rgb(0, 0, 0) });
-    page.drawText(scaleRatio + " m", { x: scaleX + scaleLength - 18, y: scaleY - 18, size: 9, color: rgb(0, 0, 0) });
+    page.drawText("0", { x: scaleStartX - 3, y: scaleY - 16, size: 8, color: rgb(0, 0, 0) });
+    page.drawText(scaleRatio + " m", { x: scaleStartX + scaleLength - 20, y: scaleY - 16, size: 8, color: rgb(0, 0, 0) });
     
-    currentY = compassY - 30;
+    yPos -= 60;
     
-    // Border Kotak II
-    const compassBoxBottomY = currentY;
+    const box2Bottom = yPos;
     page.drawRectangle({
         x: sidebarX,
-        y: compassBoxBottomY,
+        y: box2Bottom,
         width: sidebarWidth,
-        height: compassBoxStartY - compassBoxBottomY,
+        height: box2Top - box2Bottom,
         borderColor: rgb(0, 0, 0),
         borderWidth: 1.5
     });
     
-    currentY -= 20;
+    yPos -= 15;
     
-    // --------- KOTAK III: KETERANGAN (LEGENDA) ---------
-    const legendBoxStartY = currentY;
+    // ========== KOTAK 3: KETERANGAN (LEGENDA) ==========
+    const box3Top = yPos;
     
-    page.drawText("KETERANGAN:", { x: sidebarX + 10, y: currentY - 12, size: 12, color: rgb(0, 0, 0) });
-    currentY -= 30;
+    yPos -= paddingY;
+    page.drawText("KETERANGAN:", { x: sidebarX + paddingX, y: yPos, size: 11, color: rgb(0, 0, 0) });
     
-    const lineHeight = 14;
-    const maxLegendItems = 15;
+    yPos -= 20;
     
     const fileIds = Object.keys(uploadedFiles);
     const totalFiles = fileIds.length;
+    const lineHeight = 13;
+    const maxLegendItems = 16;
     const useDoubleColumn = totalFiles > maxLegendItems;
     const itemsPerColumn = useDoubleColumn ? Math.ceil(totalFiles / 2) : totalFiles;
     
-    const legendStartY = currentY;
+    const legendStartY = yPos;
     
     fileIds.forEach((id, index) => {
         const meta = uploadedFiles[id];
         
-        let currentX = sidebarX + 10;
+        let itemX = sidebarX + paddingX;
         let itemY = legendStartY - (index % itemsPerColumn) * lineHeight;
         
         if (useDoubleColumn && index >= itemsPerColumn) {
-            currentX = sidebarX + 125;
+            itemX = sidebarX + paddingX + 118;
             itemY = legendStartY - ((index - itemsPerColumn) % itemsPerColumn) * lineHeight;
         }
         
@@ -1476,13 +1476,13 @@ async function exportPdfFromLayers() {
         
         // Color box
         page.drawRectangle({
-            x: currentX,
+            x: itemX,
             y: itemY - 7,
-            width: 14,
-            height: 8,
+            width: 13,
+            height: 7,
             color: rgb(fillRgb.r, fillRgb.g, fillRgb.b),
             borderColor: rgb(strokeRgb.r, strokeRgb.g, strokeRgb.b),
-            borderWidth: 1,
+            borderWidth: 0.8,
             opacity: meta.fillOpacity || 0.4
         });
         
@@ -1497,53 +1497,53 @@ async function exportPdfFromLayers() {
         
         const areaHa = (layerArea / 10000).toFixed(2);
         
-        // Truncate name if too long
+        // Truncate name
         let displayName = meta.name.replace('.gpx', '');
-        if (useDoubleColumn && displayName.length > 11) {
-            displayName = displayName.substring(0, 9) + '..';
-        } else if (!useDoubleColumn && displayName.length > 20) {
-            displayName = displayName.substring(0, 18) + '..';
+        const maxChars = useDoubleColumn ? 10 : 18;
+        if (displayName.length > maxChars) {
+            displayName = displayName.substring(0, maxChars - 2) + '..';
         }
         
         // Text label
         page.drawText(displayName + " - " + areaHa + " Ha", { 
-            x: currentX + 18, 
-            y: itemY - 6, 
+            x: itemX + 17, 
+            y: itemY - 5, 
             size: 7,
             color: rgb(0, 0, 0) 
         });
     });
     
-    currentY = legendStartY - (itemsPerColumn * lineHeight) - 15;
+    yPos = legendStartY - (itemsPerColumn * lineHeight) - 12;
     
-    // TOTAL LUAS
+    // Total Luas
     const totalHa = (totalArea / 10000).toFixed(2);
     page.drawText("Total Luas: " + totalHa + " Ha", { 
-        x: sidebarX + 10, 
-        y: currentY, 
-        size: 11, 
-        color: rgb(0, 0, 0),
-        weight: 600
+        x: sidebarX + paddingX, 
+        y: yPos, 
+        size: 10, 
+        color: rgb(0, 0, 0)
     });
     
-    currentY -= 15;
+    yPos -= paddingY + 5;
     
-    // Border Kotak III
-    const legendBoxBottomY = currentY;
+    const box3Bottom = yPos;
     page.drawRectangle({
         x: sidebarX,
-        y: legendBoxBottomY,
+        y: box3Bottom,
         width: sidebarWidth,
-        height: legendBoxStartY - legendBoxBottomY,
+        height: box3Top - box3Bottom,
         borderColor: rgb(0, 0, 0),
         borderWidth: 1.5
     });
     
-    // --------- FOOTER ---------
+    // ========== FOOTER ==========
     const now = new Date();
     const dateStr = now.toLocaleDateString('id-ID');
     page.drawText("Dicetak: " + dateStr, { 
-        x: 50, y: 20, size: 8, color: rgb(0.4, 0.4, 0.4) 
+        x: 50, 
+        y: 20, 
+        size: 8, 
+        color: rgb(0.4, 0.4, 0.4) 
     });
     
     const pdfBytes = await pdfDoc.save();
