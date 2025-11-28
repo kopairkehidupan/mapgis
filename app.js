@@ -373,16 +373,29 @@ function openRename(id){
   };
   input.onblur = function(){ finishRename(id, input.value); };
 }
+
 function finishRename(id, val){
   val = (val||'').trim() || uploadedFiles[id].name;
-  uploadedFiles[id].name = val;
+  var meta = uploadedFiles[id];
+  
+  // Update nama layer
+  meta.name = val;
+  
+  // AUTO UPDATE LABEL BLOCK NAME
+  meta.labelSettings.blockName = val.replace('.gpx', '');
+  
   var card = document.getElementById('file-'+id);
   var input = card.querySelector('input[type=text]');
   var title = document.createElement('div'); title.className='file-title'; title.innerText = val; title.onclick = function(){ openRename(id); };
   input.replaceWith(title);
-  // update properties header if open
+  
+  // Update properties header if open
   if(lastSelectedId === id) el('#propName').value = val;
+  
+  // Refresh labels di peta
+  updateMapLabels(id);
 }
+
 function cancelRename(id, old){ var card = document.getElementById('file-'+id); if(!card) return; var input = card.querySelector('input[type=text]'); var title = document.createElement('div'); title.className='file-title'; title.innerText = old; title.onclick = function(){ openRename(id); }; input.replaceWith(title); }
 
 // --- Properties panel ---
@@ -417,7 +430,7 @@ function openProperties(id){
 
   // Load label settings
   el('#labelShow').checked = meta.labelSettings.show;
-  el('#labelBlockName').value = meta.labelSettings.blockName;
+  // HAPUS baris labelBlockName karena input sudah tidak ada
   el('#labelTextColor').value = meta.labelSettings.textColor;
   el('#labelTextSize').value = meta.labelSettings.textSize;
   el('#labelSizeVal').innerText = meta.labelSettings.textSize;
@@ -574,15 +587,26 @@ function cleanupOrphanLabels() {
 
 function closeProperties(){ lastSelectedId = null; el('#propertiesPanel').classList.add('hidden'); }
 
-// hook save name
+// hook save name - AUTO UPDATE LABEL
 el('#propSaveName').onclick = function(){
   if(!lastSelectedId) return;
   var v = el('#propName').value.trim() || uploadedFiles[lastSelectedId].name;
-  uploadedFiles[lastSelectedId].name = v;
-  // update UI title
+  var meta = uploadedFiles[lastSelectedId];
+  
+  // Update nama layer
+  meta.name = v;
+  
+  // AUTO UPDATE LABEL BLOCK NAME
+  meta.labelSettings.blockName = v.replace('.gpx', '');
+  
+  // Update UI title
   var card = document.getElementById('file-'+lastSelectedId);
   if(card) card.querySelector('.file-title').innerText = v;
-  alert('Nama disimpan.');
+  
+  // Refresh labels di peta
+  updateMapLabels(lastSelectedId);
+  
+  alert('Nama layer dan label berhasil disimpan!');
 };
 
 // style controls live display
@@ -635,7 +659,7 @@ el('#applyStyle').onclick = function(){
   
   meta.labelSettings = {
     show: el('#labelShow').checked,
-    blockName: el('#labelBlockName').value.trim() || meta.name.replace('.gpx', ''),
+    blockName: meta.name.replace('.gpx', ''), // AUTO dari nama layer
     textColor: el('#labelTextColor').value,
     textSize: parseInt(el('#labelTextSize').value),
     offsetX: existingOffsetX,
