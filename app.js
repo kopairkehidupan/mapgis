@@ -587,28 +587,6 @@ function cleanupOrphanLabels() {
 
 function closeProperties(){ lastSelectedId = null; el('#propertiesPanel').classList.add('hidden'); }
 
-// hook save name - AUTO UPDATE LABEL
-el('#propSaveName').onclick = function(){
-  if(!lastSelectedId) return;
-  var v = el('#propName').value.trim() || uploadedFiles[lastSelectedId].name;
-  var meta = uploadedFiles[lastSelectedId];
-  
-  // Update nama layer
-  meta.name = v;
-  
-  // AUTO UPDATE LABEL BLOCK NAME
-  meta.labelSettings.blockName = v.replace('.gpx', '');
-  
-  // Update UI title
-  var card = document.getElementById('file-'+lastSelectedId);
-  if(card) card.querySelector('.file-title').innerText = v;
-  
-  // Refresh labels di peta
-  updateMapLabels(lastSelectedId);
-  
-  alert('Nama layer dan label berhasil disimpan!');
-};
-
 // style controls live display
 el('#styleStrokeWidth').oninput = function(){ el('#strokeWidthVal').innerText = this.value; };
 el('#styleFillOpacity').oninput = function(){ el('#fillOpacityVal').innerText = this.value; };
@@ -629,9 +607,18 @@ el('#resetLabelPosition').onclick = function(){
 };
 
 // apply ALL (style + label) to lastSelectedId
+// apply ALL (nama + style + label) to lastSelectedId
 el('#applyStyle').onclick = function(){
   if(!lastSelectedId) return alert('Pilih layer dulu.');
   var meta = uploadedFiles[lastSelectedId];
+  
+  // ===== APPLY NAMA LAYER =====
+  var newName = el('#propName').value.trim() || meta.name;
+  meta.name = newName;
+  
+  // Update nama di sidebar card
+  var card = document.getElementById('file-'+lastSelectedId);
+  if(card) card.querySelector('.file-title').innerText = newName;
   
   // ===== APPLY STYLE =====
   meta.color = el('#styleStrokeColor').value;
@@ -659,7 +646,7 @@ el('#applyStyle').onclick = function(){
   
   meta.labelSettings = {
     show: el('#labelShow').checked,
-    blockName: meta.name.replace('.gpx', ''), // AUTO dari nama layer
+    blockName: newName.replace('.gpx', ''), // AUTO dari nama layer yang baru
     textColor: el('#labelTextColor').value,
     textSize: parseInt(el('#labelTextSize').value),
     offsetX: existingOffsetX,
@@ -669,7 +656,7 @@ el('#applyStyle').onclick = function(){
   // Update labels on map
   updateMapLabels(lastSelectedId);
   
-  alert('Semua perubahan diterapkan!');
+  alert('Semua perubahan (nama, style, label) diterapkan!');
 };
 
 // revert ALL (style + label) to defaults
