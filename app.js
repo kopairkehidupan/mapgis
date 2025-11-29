@@ -1038,15 +1038,15 @@ async function exportPdfFromLayers() {
     const gridColor = rgb(0.7, 0.7, 0.7);
     const numGridLines = 4;
     
-    // Vertical grid lines
+    // Vertical grid lines - LANGSUNG KE BORDER
     for (let i = 0; i <= numGridLines; i++) {
         const lng = minX + (maxX - minX) * (i / numGridLines);
-        const [x, y1] = project([lng, minY]);
-        const [, y2] = project([lng, maxY]);
+        const [x] = project([lng, minY]); // Hanya ambil x position
         
+        // Gambar garis dari BOTTOM BORDER ke TOP BORDER
         page.drawLine({
-            start: { x, y: y1 },
-            end: { x, y: y2 },
+            start: { x, y: mapOffsetY },  // Bottom border
+            end: { x, y: mapOffsetY + mapHeight },  // Top border
             thickness: 0.5,
             color: gridColor,
             dashArray: [3, 3]
@@ -1056,15 +1056,15 @@ async function exportPdfFromLayers() {
         page.drawText(lngLabel, { x: x - 20, y: mapOffsetY - 15, size: 8, color: rgb(0, 0, 0) });
     }
     
-    // Horizontal grid lines
+    // Horizontal grid lines - LANGSUNG KE BORDER
     for (let i = 0; i <= numGridLines; i++) {
         const lat = minY + (maxY - minY) * (i / numGridLines);
-        const [x1, y] = project([minX, lat]);
-        const [x2] = project([maxX, lat]);
+        const [, y] = project([minX, lat]); // Hanya ambil y position
         
+        // Gambar garis dari LEFT BORDER ke RIGHT BORDER
         page.drawLine({
-            start: { x: x1, y },
-            end: { x: x2, y },
+            start: { x: mapOffsetX, y },  // Left border
+            end: { x: mapOffsetX + mapWidth, y },  // Right border
             thickness: 0.5,
             color: gridColor,
             dashArray: [3, 3]
