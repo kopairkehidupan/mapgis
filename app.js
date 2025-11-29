@@ -1005,11 +1005,39 @@ async function exportPdfFromLayers() {
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([842, 595]); // A4 landscape
 
-    const gj = editableLayers.toGeoJSON();
-    if (!gj || !gj.features || gj.features.length === 0) {
-        alert("Tidak ada data untuk dicetak.");
+    // ===== FILTER HANYA FILE YANG DICENTANG =====
+    const visibleFiles = {};
+    const allFeatures = [];
+    
+    Object.keys(uploadedFiles).forEach(id => {
+        const card = document.getElementById('file-' + id);
+        if (!card) return;
+        
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        
+        // Hanya proses jika checkbox dicentang
+        if (checkbox && checkbox.checked) {
+            visibleFiles[id] = uploadedFiles[id];
+            
+            // Ambil semua features dari file ini
+            const layerGj = uploadedFiles[id].group.toGeoJSON();
+            if (layerGj && layerGj.features) {
+                allFeatures.push(...layerGj.features);
+            }
+        }
+    });
+    
+    // Cek apakah ada data yang visible
+    if (allFeatures.length === 0) {
+        alert("Tidak ada data yang dicentang untuk dicetak.");
         return;
     }
+    
+    // Buat GeoJSON gabungan dari file yang visible
+    const gj = {
+        type: "FeatureCollection",
+        features: allFeatures
+    };
 
     // --------- Hitung bounding box ---------
     const bbox = turf.bbox(gj);
@@ -1137,8 +1165,9 @@ async function exportPdfFromLayers() {
     // --------- Gambar Polygon & Polyline ---------
     let totalArea = 0;
     
-    Object.keys(uploadedFiles).forEach(id => {
-        const meta = uploadedFiles[id];
+    // HANYA LOOP UNTUK FILE YANG VISIBLE (DICENTANG)
+    Object.keys(visibleFiles).forEach(id => {
+        const meta = visibleFiles[id];
         const layerGj = meta.group.toGeoJSON();
         
         const strokeRgb = hexToRgb(meta.color || '#0077ff');
@@ -1512,7 +1541,7 @@ async function exportPdfFromLayers() {
     
     yPos -= 22;
     
-    const fileIds = Object.keys(uploadedFiles);
+    const fileIds = Object.keys(visibleFiles);
     const totalFiles = fileIds.length;
     const lineHeight = 13;
     const maxLegendItems = 16;
