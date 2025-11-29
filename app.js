@@ -104,7 +104,6 @@ map.on(L.Draw.Event.CREATED, function(e){
         markerSymbol: 'circle'
     };
     
-    // Simpan ke uploadedFiles
     uploadedFiles[id] = {
         name: defaultName,
         group: group,
@@ -123,29 +122,8 @@ map.on(L.Draw.Event.CREATED, function(e){
             offsetX: 0,
             offsetY: 0
         },
-        isDrawn: true  // Flag untuk layer yang digambar manual
-    };
-    
-    // Simpan ke uploadedFiles
-    uploadedFiles[id] = {
-        name: defaultName,
-        group: group,
-        bounds: bounds,
-        color: metaDefaults.color,
-        weight: metaDefaults.weight,
-        fillColor: metaDefaults.fillColor,
-        fillOpacity: metaDefaults.fillOpacity,
-        dashArray: metaDefaults.dashArray,
-        markerSymbol: metaDefaults.markerSymbol,
-        labelSettings: {
-            show: true,
-            blockName: defaultName,
-            textColor: '#000000',
-            textSize: 12,
-            offsetX: 0,
-            offsetY: 0
-        },
-        isDrawn: true  // Flag untuk layer yang digambar manual
+        isDrawn: true,
+        includeInTotal: true  // ← BARU: Default dihitung dalam total
     };
     
     // ===== APPLY STYLE LANGSUNG KE LAYER =====
@@ -437,8 +415,38 @@ function addFileCard(id, meta){
   var info = document.createElement('div'); info.className='muted';
   info.innerText = meta.summary || '';
   folder.appendChild(info);
+  
+  // ===== TAMBAHAN BARU: Checkbox Hitung Luas =====
+  var totalControl = document.createElement('div');
+  totalControl.style.marginTop = '6px';
+  totalControl.style.fontSize = '11px';
+  totalControl.style.display = 'flex';
+  totalControl.style.alignItems = 'center';
+  totalControl.style.gap = '4px';
+  
+  var totalCheckbox = document.createElement('input');
+  totalCheckbox.type = 'checkbox';
+  totalCheckbox.id = 'totalCheck-' + id;
+  totalCheckbox.checked = uploadedFiles[id] ? uploadedFiles[id].includeInTotal : true;
+  totalCheckbox.onchange = function(e) {
+    e.stopPropagation();
+    if (uploadedFiles[id]) {
+      uploadedFiles[id].includeInTotal = totalCheckbox.checked;
+      console.log(uploadedFiles[id].name + ' includeInTotal:', totalCheckbox.checked);
+    }
+  };
+  
+  var totalLabel = document.createElement('label');
+  totalLabel.htmlFor = 'totalCheck-' + id;
+  totalLabel.innerText = '📊 Hitung dalam Total Luas';
+  totalLabel.style.cursor = 'pointer';
+  totalLabel.style.userSelect = 'none';
+  
+  totalControl.appendChild(totalCheckbox);
+  totalControl.appendChild(totalLabel);
+  folder.appendChild(totalControl);
+  
   li.appendChild(folder);
-
   ul.appendChild(li);
 }
 
@@ -915,7 +923,8 @@ el('#btnUpload').onclick = function(){
             textSize: 12,
             offsetX: 0,
             offsetY: 0
-          }
+          },
+          includeInTotal: true  // ← BARU: Default dihitung dalam total
         };
 
         group.eachLayer(function(l){
@@ -1749,19 +1758,49 @@ async function exportPdfFromLayers() {
             displayName = displayName.substring(0, maxChars - 2) + '..';
         }
         
-        // Text label
-        page.drawText(displayName + " - " + areaHa + " Ha", { 
+        // Text label dengan indikator
+        const labelText = displayName + " - " + areaHa + " Ha";
+        const labelColor = meta.includeInTotal ? rgb(0, 0, 0) : rgb(0.5, 0.5, 0.5); // Abu-abu jika tidak dihitung
+        
+        page.drawText(labelText, { 
             x: itemX + 17, 
             y: itemY - 5, 
             size: 7,
-            color: rgb(0, 0, 0) 
+            color: labelColor
         });
+        
+        // Tambahkan tanda * jika TIDAK dihitung
+        if (!meta.includeInTotal) {
+            page.drawText("*", { 
+                x: itemX + 17 + (labelText.length * 7 * 0.4) + 2, 
+                y: itemY - 5, 
+                size: 9,
+                color: rgb(0.7, 0, 0) // Merah
+            });
+        }
     });
     
     yPos = legendStartY - (itemsPerColumn * lineHeight) - 15;
     
+    // ===== HITUNG TOTAL LUAS HANYA DARI FILE YANG includeInTotal = true =====
+    let calculatedTotalArea = 0;
+    
+    Object.keys(visibleFiles).forEach(id => {
+        const meta = uploadedFiles[id];
+        
+        // Hanya hitung jika includeInTotal = true
+        if (meta.includeInTotal) {
+            const layerGj = meta.group.toGeoJSON();
+            layerGj.features.forEach(f => {
+                if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
+                    calculatedTotalArea += turf.area(f);
+                }
+            });
+        }
+    });
+    
     // Total Luas (centered)
-    const totalHa = (totalArea / 10000).toFixed(2);
+    const totalHa = (calculatedTotalArea / 10000).toFixed(2);
     const totalText = "Total Luas: " + totalHa + " Ha";
     const totalWidth = totalText.length * 6;
     page.drawText(totalText, { 
@@ -1784,6 +1823,27 @@ async function exportPdfFromLayers() {
     });
     
     // ========== FOOTER ==========
+    // Keterangan tanda * (jika ada file yang tidak dihitung)
+    const hasExcluded = Object.keys(visibleFiles).some(id => !uploadedFiles[id].includeInTotal);
+    
+    if (hasExcluded) {
+        page.drawText("* Tidak dihitung dalam Total Luas", { 
+            x: 50, 
+            y: 35, 
+            size: 7, 
+            color: rgb(0.5, 0.5, 0.5) 
+        });
+    }
+    
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('id-ID');
+    page.drawText("Dicetak: " + dateStr, { 
+        x: 50, 
+        y: 20, 
+        size: 8, 
+        color: rgb(0.4, 0.4, 0.4) 
+    });
+  
     const now = new Date();
     const dateStr = now.toLocaleDateString('id-ID');
     page.drawText("Dicetak: " + dateStr, { 
