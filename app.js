@@ -1844,15 +1844,6 @@ async function exportPdfFromLayers() {
         color: rgb(0.4, 0.4, 0.4) 
     });
   
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('id-ID');
-    page.drawText("Dicetak: " + dateStr, { 
-        x: 50, 
-        y: 20, 
-        size: 8, 
-        color: rgb(0.4, 0.4, 0.4) 
-    });
-    
     const pdfBytes = await pdfDoc.save();
 
     // Generate nama file dari title + subtitle
