@@ -126,6 +126,39 @@ map.on(L.Draw.Event.CREATED, function(e){
         isDrawn: true  // Flag untuk layer yang digambar manual
     };
     
+    // Simpan ke uploadedFiles
+    uploadedFiles[id] = {
+        name: defaultName,
+        group: group,
+        bounds: bounds,
+        color: metaDefaults.color,
+        weight: metaDefaults.weight,
+        fillColor: metaDefaults.fillColor,
+        fillOpacity: metaDefaults.fillOpacity,
+        dashArray: metaDefaults.dashArray,
+        markerSymbol: metaDefaults.markerSymbol,
+        labelSettings: {
+            show: true,
+            blockName: defaultName,
+            textColor: '#000000',
+            textSize: 12,
+            offsetX: 0,
+            offsetY: 0
+        },
+        isDrawn: true  // Flag untuk layer yang digambar manual
+    };
+    
+    // ===== APPLY STYLE LANGSUNG KE LAYER =====
+    if (layer.setStyle) {
+        layer.setStyle({
+            color: metaDefaults.color,
+            weight: metaDefaults.weight,
+            fillColor: metaDefaults.fillColor,
+            fillOpacity: metaDefaults.fillOpacity,
+            dashArray: metaDefaults.dashArray
+        });
+    }
+    
     // Tambahkan ke editableLayers
     editableLayers.addLayer(layer);
     
@@ -141,6 +174,11 @@ map.on(L.Draw.Event.CREATED, function(e){
     }
     
     console.log('Layer drawn added to file list:', defaultName);
+    console.log('Layer style applied:', {
+        color: metaDefaults.color,
+        fillColor: metaDefaults.fillColor,
+        fillOpacity: metaDefaults.fillOpacity
+    });
     
     // Auto-open rename untuk layer baru
     setTimeout(function() {
@@ -756,7 +794,23 @@ el('#applyStyle').onclick = function(){
   // Update labels on map
   updateMapLabels(lastSelectedId);
   
+  // ===== FORCE REFRESH LAYER DI PETA =====
+  meta.group.eachLayer(function(layer){
+    // Remove dan re-add layer untuk force refresh
+    if (map.hasLayer(layer)) {
+      layer.redraw ? layer.redraw() : null; // Untuk path layers
+    }
+  });
+  
   alert('Semua perubahan (nama, style, label) diterapkan!');
+
+  console.log('Style applied to layer:', {
+      id: lastSelectedId,
+      name: meta.name,
+      color: meta.color,
+      fillColor: meta.fillColor,
+      fillOpacity: meta.fillOpacity
+  });
 };
 
 // revert ALL (style + label) to defaults
