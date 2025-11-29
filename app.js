@@ -54,7 +54,99 @@ var drawControl = new L.Control.Draw({
   draw:{ polygon:true, polyline:true, rectangle:true, marker:true, circle:false }
 });
 map.addControl(drawControl);
-map.on(L.Draw.Event.CREATED, function(e){ editableLayers.addLayer(e.layer); });
+map.on(L.Draw.Event.CREATED, function(e){ 
+    const layer = e.layer;
+    const layerType = e.layerType;
+    
+    // Generate unique ID
+    const id = 'drawn-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    
+    // Increment counter
+    drawnLayerCounters[layerType] = (drawnLayerCounters[layerType] || 0) + 1;
+    
+    // Tentukan nama default dengan counter
+    let defaultName = '';
+    if (layerType === 'polygon') {
+        defaultName = 'Polygon ' + drawnLayerCounters[layerType];
+    } else if (layerType === 'polyline') {
+        defaultName = 'Polyline ' + drawnLayerCounters[layerType];
+    } else if (layerType === 'rectangle') {
+        defaultName = 'Rectangle ' + drawnLayerCounters[layerType];
+    } else if (layerType === 'marker') {
+        defaultName = 'Marker ' + drawnLayerCounters[layerType];
+    } else {
+        defaultName = 'Layer Baru';
+    }
+    
+    // Buat FeatureGroup baru untuk layer ini
+    const group = L.featureGroup();
+    group.addLayer(layer);
+    
+    // Attach click event
+    attachLayerClickEvent(layer, id);
+    
+    // Hitung bounds
+    let bounds = null;
+    if (layer.getBounds) {
+        bounds = layer.getBounds();
+    } else if (layer.getLatLng) {
+        const latlng = layer.getLatLng();
+        bounds = L.latLngBounds([latlng, latlng]);
+    }
+    
+    // Default style settings
+    const metaDefaults = {
+        color: '#000000',        // Line hitam
+        weight: 3,
+        fillColor: '#ee00ff',    // Polygon pink
+        fillOpacity: 0.4,
+        dashArray: null,
+        markerSymbol: 'circle'
+    };
+    
+    // Simpan ke uploadedFiles
+    uploadedFiles[id] = {
+        name: defaultName,
+        group: group,
+        bounds: bounds,
+        color: metaDefaults.color,
+        weight: metaDefaults.weight,
+        fillColor: metaDefaults.fillColor,
+        fillOpacity: metaDefaults.fillOpacity,
+        dashArray: metaDefaults.dashArray,
+        markerSymbol: metaDefaults.markerSymbol,
+        labelSettings: {
+            show: true,
+            blockName: defaultName,
+            textColor: '#000000',
+            textSize: 12,
+            offsetX: 0,
+            offsetY: 0
+        },
+        isDrawn: true  // Flag untuk layer yang digambar manual
+    };
+    
+    // Tambahkan ke editableLayers
+    editableLayers.addLayer(layer);
+    
+    // Tambahkan card di file list
+    addFileCard(id, {
+        name: defaultName,
+        summary: layerType.charAt(0).toUpperCase() + layerType.slice(1) + ' (Drawn)'
+    });
+    
+    // Update labels jika polygon
+    if (layerType === 'polygon') {
+        updateMapLabels(id);
+    }
+    
+    console.log('Layer drawn added to file list:', defaultName);
+    
+    // Auto-open rename untuk layer baru
+    setTimeout(function() {
+        openRename(id);
+    }, 300);
+});
 
 // ===== TAMBAHAN BARU: Event listener untuk edit layer =====
 map.on(L.Draw.Event.EDITED, function(e) {
@@ -156,6 +248,14 @@ map.on('draw:editvertex', function(e) {
 var uploadedFiles = {}; // id -> { name, group:LayerGroup, bounds, color, weight, fillColor, fillOpacity, dashArray, markerSymbol }
 var lastSelectedId = null;
 var labelLayers = {}; // id -> array of label markers
+
+// Counter untuk nama default layer yang digambar
+var drawnLayerCounters = {
+    polygon: 0,
+    polyline: 0,
+    rectangle: 0,
+    marker: 0
+};
 
 // --- Helpers: create group from GeoJSON, adding each sublayer to a LayerGroup ---
 // --- Helpers: create group from GeoJSON, adding each sublayer to a LayerGroup ---
