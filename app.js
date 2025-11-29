@@ -913,9 +913,9 @@ function showPdfModal() {
   const titleInput = document.getElementById('pdfTitle');
   const subtitleInput = document.getElementById('pdfSubtitle');
   
-  // Set nilai default
-  titleInput.value = pdfSettings.title;
-  subtitleInput.value = pdfSettings.subtitle;
+  // Set nilai default (title wajib, subtitle kosong)
+  titleInput.value = pdfSettings.title || "PETA AREAL KEBUN";
+  subtitleInput.value = pdfSettings.subtitle || ""; // Kosong by default
   
   // Tampilkan modal
   modal.style.display = 'flex';
@@ -941,8 +941,16 @@ document.getElementById('btnConfirmPdf').onclick = function() {
   const titleInput = document.getElementById('pdfTitle');
   const subtitleInput = document.getElementById('pdfSubtitle');
   
-  pdfSettings.title = titleInput.value.trim() || "PETA AREAL KEBUN";
-  pdfSettings.subtitle = subtitleInput.value.trim() || "";
+  // VALIDASI: Title wajib diisi
+  const titleValue = titleInput.value.trim();
+  if (!titleValue || titleValue.length === 0) {
+    alert('Title harus diisi!');
+    titleInput.focus();
+    return; // Stop execution
+  }
+  
+  pdfSettings.title = titleValue;
+  pdfSettings.subtitle = subtitleInput.value.trim(); // Subtitle boleh kosong
   
   // Sembunyikan modal
   hidePdfModal();
@@ -1345,22 +1353,27 @@ async function exportPdfFromLayers() {
     
     // ========== KOTAK 1: TITLE & SUBTITLE (CENTER) ==========
     const box1Top = yPos;
-    yPos -= 18;
     
-    // Title (centered)
-    const titleText = pdfSettings.title || "PETA AREAL KEBUN";
-    const titleWidth = titleText.length * 8; // Estimasi lebar
-    page.drawText(titleText, { 
-        x: centerX - (titleWidth / 2), 
-        y: yPos, 
-        size: 14, 
-        color: rgb(0, 0, 0) 
-    });
+    // CEK: Apakah subtitle ada atau tidak
+    const hasSubtitle = pdfSettings.subtitle && pdfSettings.subtitle.length > 0;
     
-    yPos -= 20;
-    
-    // Subtitle (centered)
-    if (pdfSettings.subtitle && pdfSettings.subtitle.length > 0) {
+    if (hasSubtitle) {
+        // ===== ADA SUBTITLE: Layout Normal =====
+        yPos -= 18;
+        
+        // Title (centered horizontal, top position)
+        const titleText = pdfSettings.title;
+        const titleWidth = titleText.length * 8;
+        page.drawText(titleText, { 
+            x: centerX - (titleWidth / 2), 
+            y: yPos, 
+            size: 14, 
+            color: rgb(0, 0, 0) 
+        });
+        
+        yPos -= 20;
+        
+        // Subtitle (centered horizontal, below title)
         const subtitleWidth = pdfSettings.subtitle.length * 6;
         page.drawText(pdfSettings.subtitle, { 
             x: centerX - (subtitleWidth / 2), 
@@ -1368,22 +1381,33 @@ async function exportPdfFromLayers() {
             size: 10, 
             color: rgb(0.4, 0.4, 0.4) 
         });
+        
         yPos -= 15;
+        
     } else {
-        yPos -= 5;
+        // ===== TIDAK ADA SUBTITLE: Title di Tengah Vertikal =====
+        
+        // Tinggi kotak title (estimasi)
+        const boxHeight = 50; // Tinggi kotak yang akan dibuat
+        
+        // Hitung posisi tengah vertikal kotak
+        const titleY = yPos - (boxHeight / 2) + 7; // +7 untuk centering text baseline
+        
+        // Title (centered horizontal DAN vertical)
+        const titleText = pdfSettings.title;
+        const titleWidth = titleText.length * 8;
+        page.drawText(titleText, { 
+            x: centerX - (titleWidth / 2), 
+            y: titleY, 
+            size: 14, 
+            color: rgb(0, 0, 0) 
+        });
+        
+        // Sesuaikan yPos untuk bottom kotak
+        yPos -= boxHeight;
     }
     
     const box1Bottom = yPos - 10;
-    page.drawRectangle({
-        x: sidebarX,
-        y: box1Bottom,
-        width: sidebarWidth,
-        height: box1Top - box1Bottom,
-        borderColor: rgb(0, 0, 0),
-        borderWidth: 1.5
-    });
-    
-    yPos = box1Bottom - 15;
     
     // ========== KOTAK 2: KOMPAS & SKALA (CENTER) ==========
     const box2Top = yPos;
