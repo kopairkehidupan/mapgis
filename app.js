@@ -1,3 +1,4 @@
+
 // --- Initialization ---
 var map = L.map('map').setView([0.5,101.4],12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22}).addTo(map);
@@ -95,14 +96,34 @@ map.on(L.Draw.Event.CREATED, function(e){
     }
     
     // Default style settings
-    const metaDefaults = {
-        color: '#000000',        // Line hitam
-        weight: 3,
-        fillColor: '#ee00ff',    // Polygon pink
-        fillOpacity: 0.4,
-        dashArray: null,
-        markerSymbol: 'circle'
-    };
+    // ===== DETEKSI: Polyline vs Polygon =====
+    const metaDefaults = {};
+    
+    if (layerType === 'polyline') {
+        // POLYLINE: Gunakan warna pink (sama dengan polygon)
+        metaDefaults.color = '#ee00ff';
+        metaDefaults.weight = 3;
+        metaDefaults.fillColor = '#ee00ff';  // Tidak digunakan
+        metaDefaults.fillOpacity = 0.4;       // Tidak digunakan
+        metaDefaults.dashArray = null;
+        metaDefaults.markerSymbol = 'circle';
+    } else if (layerType === 'polygon' || layerType === 'rectangle') {
+        // POLYGON: Border hitam, fill pink
+        metaDefaults.color = '#000000';
+        metaDefaults.weight = 3;
+        metaDefaults.fillColor = '#ee00ff';
+        metaDefaults.fillOpacity = 0.4;
+        metaDefaults.dashArray = null;
+        metaDefaults.markerSymbol = 'circle';
+    } else {
+        // MARKER: Default
+        metaDefaults.color = '#000000';
+        metaDefaults.weight = 3;
+        metaDefaults.fillColor = '#ee00ff';
+        metaDefaults.fillOpacity = 0.8;
+        metaDefaults.dashArray = null;
+        metaDefaults.markerSymbol = 'circle';
+    }
     
     uploadedFiles[id] = {
         name: defaultName,
@@ -385,13 +406,17 @@ function geojsonToGpx(geojson, name, metadata){
       var c = geom.coordinates;
       xml += '<wpt lat="'+c[1]+'" lon="'+c[0]+'"><name>' + (esc(f.properties && f.properties.name || 'pt')) + '</name></wpt>\n';
     } else if(geom.type === 'LineString'){
-      xml += '<trk><name>' + (esc(f.properties && f.properties.name || 'line')) + '</name><trkseg>\n';
+      xml += '<trk><name>' + (esc(f.properties && f.properties.name || 'polyline')) + '</name>';
+      xml += '<type>polyline</type>'; // ← Tandai sebagai polyline
+      xml += '<trkseg>\n';
       geom.coordinates.forEach(function(c){ xml += '<trkpt lat="'+c[1]+'" lon="'+c[0]+'"></trkpt>\n'; });
       xml += '</trkseg></trk>\n';
     } else if(geom.type === 'Polygon'){
       // export outer ring as track
       var ring = geom.coordinates[0];
-      xml += '<trk><name>' + (esc(f.properties && f.properties.name || 'poly')) + '</name><trkseg>\n';
+      xml += '<trk><name>' + (esc(f.properties && f.properties.name || 'polygon')) + '</name>';
+      xml += '<type>polygon</type>'; // ← Tandai sebagai polygon
+      xml += '<trkseg>\n';
       ring.forEach(function(c){ xml += '<trkpt lat="'+c[1]+'" lon="'+c[0]+'"></trkpt>\n'; });
       xml += '</trkseg></trk>\n';
     } else if(geom.type === 'MultiLineString'){
@@ -599,11 +624,34 @@ function openProperties(id){
 
   // Load label settings
   el('#labelShow').checked = meta.labelSettings.show;
-  // HAPUS baris labelBlockName karena input sudah tidak ada
   el('#labelTextColor').value = meta.labelSettings.textColor;
   el('#labelTextSize').value = meta.labelSettings.textSize;
   el('#labelSizeVal').innerText = meta.labelSettings.textSize;
-
+  
+  // ===== BARU: Deteksi tipe geometry dan hide/show fill controls =====
+  var gj = meta.group.toGeoJSON();
+  var hasPolyline = false;
+  var hasPolygon = false;
+  
+  gj.features.forEach(function(f) {
+    if (!f.geometry) return;
+    var type = f.geometry.type;
+    if (type === 'LineString' || type === 'MultiLineString') {
+      hasPolyline = true;
+    } else if (type === 'Polygon' || type === 'MultiPolygon') {
+      hasPolygon = true;
+    }
+  });
+  
+  // Sembunyikan fill controls jika pure polyline
+  var fillColorRow = document.querySelector('#styleFillColor').closest('.row');
+  if (hasPolyline && !hasPolygon) {
+    if (fillColorRow) fillColorRow.style.display = 'none';
+    console.log('Hide fill controls for polyline');
+  } else {
+    if (fillColorRow) fillColorRow.style.display = 'flex';
+  }
+  
   // Pastikan offsetX dan offsetY ada (untuk backward compatibility)
   if (typeof meta.labelSettings.offsetX === 'undefined') {
     meta.labelSettings.offsetX = 0;
@@ -799,13 +847,35 @@ el('#applyStyle').onclick = function(){
 
   // apply styles to each sublayer
   meta.group.eachLayer(function(layer){
-    if(layer.setStyle){
-      layer.setStyle({ color: meta.color, weight: meta.weight, dashArray: meta.dashArray, fillColor: meta.fillColor, fillOpacity: meta.fillOpacity });
-    }
-    // for markers drawn as CircleMarker
-    if(layer.setRadius){
-      layer.setStyle({ color: meta.color, fillColor: meta.fillColor });
-    }
+      if(layer.setStyle){
+        // CEK: Apakah ini Polyline atau Polygon?
+        var geoJsonLayer = layer.toGeoJSON();
+        var geomType = geoJsonLayer.geometry ? geoJsonLayer.geometry.type : null;
+        
+        if (geomType === 'LineString' || geomType === 'MultiLineString') {
+          // POLYLINE: Hanya set color, weight, dashArray (TIDAK ADA fill)
+          layer.setStyle({ 
+            color: meta.color, 
+            weight: meta.weight, 
+            dashArray: meta.dashArray 
+          });
+          console.log('Applied POLYLINE style:', meta.color, meta.weight);
+        } else {
+          // POLYGON: Set semua termasuk fill
+          layer.setStyle({ 
+            color: meta.color, 
+            weight: meta.weight, 
+            dashArray: meta.dashArray, 
+            fillColor: meta.fillColor, 
+            fillOpacity: meta.fillOpacity 
+          });
+          console.log('Applied POLYGON style:', meta.color, meta.fillColor);
+        }
+      }
+      // for markers drawn as CircleMarker
+      if(layer.setRadius){
+        layer.setStyle({ color: meta.color, fillColor: meta.fillColor });
+      }
   });
   
   // ===== APPLY LABEL =====
@@ -987,16 +1057,48 @@ el('#btnUpload').onclick = function(){
 
         var id = Date.now() + '-' + index + '-' + Math.floor(Math.random()*1000);
 
-        // ===== WARNA DEFAULT TETAP (TIDAK RANDOM) =====
-        var metaDefaults = {
-          color: '#000000',        // Line hitam RGB(0,0,0)
-          weight: 3,
-          fillColor: '#ee00ff',    // Polygon pink RGB(238,0,255)
-          fillOpacity: 0.4,
-          dashArray: null,
-          markerSymbol: 'circle'
-        };
-
+        // ===== DETEKSI GEOMETRY TYPE =====
+        var hasPolyline = false;
+        var hasPolygon = false;
+        
+        geojson.features.forEach(function(f) {
+          if (!f.geometry) return;
+          var type = f.geometry.type;
+          if (type === 'LineString' || type === 'MultiLineString') {
+            hasPolyline = true;
+          } else if (type === 'Polygon' || type === 'MultiPolygon') {
+            hasPolygon = true;
+          }
+        });
+        
+        // ===== SET WARNA DEFAULT BERDASARKAN TYPE =====
+        var metaDefaults;
+        
+        if (hasPolyline && !hasPolygon) {
+          // Pure polyline file → gunakan warna polygon (pink) untuk polyline
+          metaDefaults = {
+            color: '#ee00ff',        // Polyline PINK (mengikuti default polygon)
+            weight: 3,
+            fillColor: '#ee00ff',    // Tidak digunakan untuk polyline
+            fillOpacity: 0.4,        // Tidak digunakan untuk polyline
+            dashArray: null,
+            markerSymbol: 'circle'
+          };
+        } else {
+          // File berisi polygon atau campuran → gunakan warna default normal
+          metaDefaults = {
+            color: '#000000',        // Line hitam untuk polygon border
+            weight: 3,
+            fillColor: '#ee00ff',    // Polygon pink
+            fillOpacity: 0.4,
+            dashArray: null,
+            markerSymbol: 'circle'
+          };
+        }
+        
+        console.log('Detected geometry types:', { hasPolyline, hasPolygon });
+        console.log('Using color defaults:', metaDefaults);
+        
         var group = createGroupFromGeoJSON(geojson, metaDefaults, id);
         var bounds = group.getBounds();
 
@@ -1113,26 +1215,41 @@ function convertLineToPolygonGeoJSON(gj) {
     gj.features.forEach(function (f) {
         if (!f.geometry) return;
 
-        // Jika LineString → jadikan Polygon
+        // ===== BIARKAN LINESTRING TETAP LINESTRING =====
+        // Hanya konversi ke Polygon jika koordinat awal == koordinat akhir (closed line)
         if (f.geometry.type === "LineString") {
             var coords = f.geometry.coordinates;
 
-            if (coords.length >= 3) {
-                var ring = coords.slice();
-                ring.push(coords[0]); // Tutup polygon
-
-                newFeatures.push({
-                    type: "Feature",
-                    properties: f.properties || {},
-                    geometry: {
-                        type: "Polygon",
-                        coordinates: [ring]
-                    }
-                });
+            if (coords.length >= 4) { // Minimal 4 titik untuk polygon valid
+                var firstPoint = coords[0];
+                var lastPoint = coords[coords.length - 1];
+                
+                // CEK: Apakah LineString ini CLOSED (ujung bertemu)?
+                var isClosed = (
+                    Math.abs(firstPoint[0] - lastPoint[0]) < 0.000001 && 
+                    Math.abs(firstPoint[1] - lastPoint[1]) < 0.000001
+                );
+                
+                if (isClosed) {
+                    // Jika closed → jadikan Polygon
+                    newFeatures.push({
+                        type: "Feature",
+                        properties: f.properties || {},
+                        geometry: {
+                            type: "Polygon",
+                            coordinates: [coords]
+                        }
+                    });
+                } else {
+                    // Jika NOT closed → TETAP LineString
+                    newFeatures.push(f);
+                }
             } else {
+                // Kurang dari 4 titik → tetap LineString
                 newFeatures.push(f);
             }
         } else {
+            // Bukan LineString → langsung push
             newFeatures.push(f);
         }
     });
@@ -1841,23 +1958,79 @@ async function exportPdfFromLayers() {
             itemY = legendStartY - ((index - itemsPerColumn) % itemsPerColumn) * lineHeight;
         }
         
-        const fillRgb = hexToRgb(meta.fillColor || meta.color || '#0077ff');
-        const strokeRgb = hexToRgb(meta.color || '#0077ff');
+        // ===== DETEKSI GEOMETRY TYPE =====
+        const layerGj = meta.group.toGeoJSON();
+        let hasPolyline = false;
+        let hasPolygon = false;
         
-        // Color box
-        page.drawRectangle({
-            x: itemX,
-            y: itemY - 7,
-            width: 13,
-            height: 7,
-            color: rgb(fillRgb.r, fillRgb.g, fillRgb.b),
-            borderColor: rgb(strokeRgb.r, strokeRgb.g, strokeRgb.b),
-            borderWidth: 0.8,
-            opacity: meta.fillOpacity || 0.4
+        layerGj.features.forEach(f => {
+            if (!f.geometry) return;
+            const type = f.geometry.type;
+            if (type === 'LineString' || type === 'MultiLineString') {
+                hasPolyline = true;
+            } else if (type === 'Polygon' || type === 'MultiPolygon') {
+                hasPolygon = true;
+            }
         });
         
+        const strokeRgb = hexToRgb(meta.color || '#0077ff');
+        const strokeColor = rgb(strokeRgb.r, strokeRgb.g, strokeRgb.b);
+        
+        // ===== GAMBAR SYMBOL SESUAI TIPE =====
+        if (hasPolyline && !hasPolygon) {
+            // POLYLINE: Gambar GARIS horizontal
+            const lineY = itemY - 3.5; // Tengah vertikal dari box (7px height / 2)
+            
+            // Cek apakah ada dash pattern
+            const dashPattern = meta.dashArray || '';
+            const isDashed = dashPattern.length > 0;
+            
+            if (isDashed) {
+                // Gambar garis dashed (simplified untuk legenda)
+                const dashLength = 3;
+                const gapLength = 2;
+                let currentX = itemX;
+                const endX = itemX + 13;
+                
+                while (currentX < endX) {
+                    const segmentEnd = Math.min(currentX + dashLength, endX);
+                    page.drawLine({
+                        start: { x: currentX, y: lineY },
+                        end: { x: segmentEnd, y: lineY },
+                        thickness: 2,
+                        color: strokeColor,
+                        opacity: 1
+                    });
+                    currentX = segmentEnd + gapLength;
+                }
+            } else {
+                // Gambar garis solid
+                page.drawLine({
+                    start: { x: itemX, y: lineY },
+                    end: { x: itemX + 13, y: lineY },
+                    thickness: 2,
+                    color: strokeColor,
+                    opacity: 1
+                });
+            }
+        } else {
+            // POLYGON: Gambar KOTAK dengan fill
+            const fillRgb = hexToRgb(meta.fillColor || meta.color || '#0077ff');
+            const fillColor = rgb(fillRgb.r, fillRgb.g, fillRgb.b);
+            
+            page.drawRectangle({
+                x: itemX,
+                y: itemY - 7,
+                width: 13,
+                height: 7,
+                color: fillColor,
+                borderColor: strokeColor,
+                borderWidth: 0.8,
+                opacity: meta.fillOpacity || 0.4
+            });
+        }
+        
         // Calculate area
-        const layerGj = meta.group.toGeoJSON();
         let layerArea = 0;
         layerGj.features.forEach(f => {
             if (f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
@@ -1874,9 +2047,17 @@ async function exportPdfFromLayers() {
             displayName = displayName.substring(0, maxChars - 2) + '..';
         }
         
-        // Text label dengan indikator
-        const labelText = displayName + " - " + areaHa + " Ha";
-        const labelColor = meta.includeInTotal ? rgb(0, 0, 0) : rgb(0.5, 0.5, 0.5); // Abu-abu jika tidak dihitung
+        // ===== TEXT LABEL: Tampilkan area hanya untuk polygon =====
+        let labelText;
+        if (hasPolyline && !hasPolygon) {
+            // Polyline: Hanya nama (tanpa area)
+            labelText = displayName;
+        } else {
+            // Polygon: Nama + area
+            labelText = displayName + " - " + areaHa + " Ha";
+        }
+        
+        const labelColor = meta.includeInTotal ? rgb(0, 0, 0) : rgb(0.5, 0.5, 0.5);
         
         page.drawText(labelText, { 
             x: itemX + 17, 
@@ -1891,7 +2072,7 @@ async function exportPdfFromLayers() {
                 x: itemX + 17 + (labelText.length * 7 * 0.4) + 2, 
                 y: itemY - 5, 
                 size: 9,
-                color: rgb(0.7, 0, 0) // Merah
+                color: rgb(0.7, 0, 0)
             });
         }
     });
