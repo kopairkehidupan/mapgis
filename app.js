@@ -349,11 +349,34 @@ function attachLayerClickEvent(layer, fileId) {
 }
 
 // --- Utility: simple GPX exporter for GeoJSON (points as wpt, lines/polygons as trk) ---
-function geojsonToGpx(geojson, name){
+function geojsonToGpx(geojson, name, metadata){
   var esc = function(s){ return (''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
   var xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-  xml += '<gpx version="1.1" creator="MiniArcGIS">\n';
+  xml += '<gpx version="1.1" creator="MiniArcGIS" xmlns:miniarcgis="http://miniarcgis.local/gpx/1/0">\n';
   xml += '<name>' + esc(name||'export') + '</name>\n';
+  
+  // ===== METADATA LAYER (sebagai extensions) =====
+  if (metadata) {
+    xml += '<metadata>\n';
+    xml += '  <extensions>\n';
+    xml += '    <miniarcgis:layerName>' + esc(metadata.name) + '</miniarcgis:layerName>\n';
+    xml += '    <miniarcgis:includeInTotal>' + metadata.includeInTotal + '</miniarcgis:includeInTotal>\n';
+    xml += '    <miniarcgis:style>\n';
+    xml += '      <miniarcgis:color>' + esc(metadata.color) + '</miniarcgis:color>\n';
+    xml += '      <miniarcgis:weight>' + metadata.weight + '</miniarcgis:weight>\n';
+    xml += '      <miniarcgis:fillColor>' + esc(metadata.fillColor) + '</miniarcgis:fillColor>\n';
+    xml += '      <miniarcgis:fillOpacity>' + metadata.fillOpacity + '</miniarcgis:fillOpacity>\n';
+    xml += '      <miniarcgis:dashArray>' + esc(metadata.dashArray || '') + '</miniarcgis:dashArray>\n';
+    xml += '    </miniarcgis:style>\n';
+    xml += '    <miniarcgis:label>\n';
+    xml += '      <miniarcgis:show>' + metadata.labelSettings.show + '</miniarcgis:show>\n';
+    xml += '      <miniarcgis:blockName>' + esc(metadata.labelSettings.blockName) + '</miniarcgis:blockName>\n';
+    xml += '      <miniarcgis:textColor>' + esc(metadata.labelSettings.textColor) + '</miniarcgis:textColor>\n';
+    xml += '      <miniarcgis:textSize>' + metadata.labelSettings.textSize + '</miniarcgis:textSize>\n';
+    xml += '    </miniarcgis:label>\n';
+    xml += '  </extensions>\n';
+    xml += '</metadata>\n';
+  }
 
   geojson.features.forEach(function(f){
     var geom = f.geometry;
@@ -852,9 +875,80 @@ el('#revertStyle').onclick = function(){
 };
 
 // Export buttons
-el('#exportGeojson').onclick = function(){ if(!lastSelectedId) return; var meta = uploadedFiles[lastSelectedId]; var gj = meta.group.toGeoJSON(); var blob = new Blob([JSON.stringify(gj,null,2)],{type:'application/json'}); saveAs(blob, (meta.name||'layer') + '.geojson'); };
-el('#exportGpx').onclick = function(){ if(!lastSelectedId) return; var meta = uploadedFiles[lastSelectedId]; var gj = meta.group.toGeoJSON(); var gpx = geojsonToGpx(gj, meta.name); saveAs(new Blob([gpx],{type:'application/gpx+xml'}), (meta.name||'layer') + '.gpx'); };
-el('#exportKml').onclick = function(){ if(!lastSelectedId) return; var meta = uploadedFiles[lastSelectedId]; var gj = meta.group.toGeoJSON(); var kml = tokml(gj); saveAs(new Blob([kml],{type:'application/vnd.google-earth.kml+xml'}), (meta.name||'layer') + '.kml'); };
+el('#exportGeojson').onclick = function(){ 
+    if(!lastSelectedId) return; 
+    var meta = uploadedFiles[lastSelectedId]; 
+    var gj = meta.group.toGeoJSON(); 
+    
+    // ===== TAMBAHKAN METADATA KE SETIAP FEATURE =====
+    gj.features.forEach(function(feature) {
+        if (!feature.properties) feature.properties = {};
+        
+        // Simpan metadata layer
+        feature.properties._layerName = meta.name;
+        feature.properties._includeInTotal = meta.includeInTotal;
+        
+        // Simpan style settings
+        feature.properties._style = {
+            color: meta.color,
+            weight: meta.weight,
+            fillColor: meta.fillColor,
+            fillOpacity: meta.fillOpacity,
+            dashArray: meta.dashArray,
+            markerSymbol: meta.markerSymbol
+        };
+        
+        // Simpan label settings
+        feature.properties._label = {
+            show: meta.labelSettings.show,
+            blockName: meta.labelSettings.blockName,
+            textColor: meta.labelSettings.textColor,
+            textSize: meta.labelSettings.textSize,
+            offsetX: meta.labelSettings.offsetX,
+            offsetY: meta.labelSettings.offsetY
+        };
+    });
+    
+    var blob = new Blob([JSON.stringify(gj, null, 2)], {type:'application/json'}); 
+    saveAs(blob, (meta.name||'layer') + '.geojson'); 
+};
+el('#exportGpx').onclick = function(){ 
+    if(!lastSelectedId) return; 
+    var meta = uploadedFiles[lastSelectedId]; 
+    var gj = meta.group.toGeoJSON(); 
+    var gpx = geojsonToGpx(gj, meta.name, meta); // ← TAMBAHKAN metadata
+    saveAs(new Blob([gpx],{type:'application/gpx+xml'}), (meta.name||'layer') + '.gpx'); 
+};
+el('#exportKml').onclick = function(){ 
+    if(!lastSelectedId) return; 
+    var meta = uploadedFiles[lastSelectedId]; 
+    var gj = meta.group.toGeoJSON(); 
+    
+    // ===== TAMBAHKAN METADATA KE PROPERTIES (tokml akan convert ke ExtendedData) =====
+    gj.features.forEach(function(feature) {
+        if (!feature.properties) feature.properties = {};
+        
+        // Metadata layer
+        feature.properties.LayerName = meta.name;
+        feature.properties.IncludeInTotal = meta.includeInTotal ? 'Yes' : 'No';
+        
+        // Style settings
+        feature.properties.StrokeColor = meta.color;
+        feature.properties.StrokeWeight = meta.weight;
+        feature.properties.FillColor = meta.fillColor;
+        feature.properties.FillOpacity = meta.fillOpacity;
+        feature.properties.DashArray = meta.dashArray || '';
+        
+        // Label settings
+        feature.properties.LabelShow = meta.labelSettings.show ? 'Yes' : 'No';
+        feature.properties.LabelBlockName = meta.labelSettings.blockName;
+        feature.properties.LabelTextColor = meta.labelSettings.textColor;
+        feature.properties.LabelTextSize = meta.labelSettings.textSize;
+    });
+    
+    var kml = tokml(gj); 
+    saveAs(new Blob([kml],{type:'application/vnd.google-earth.kml+xml'}), (meta.name||'layer') + '.kml'); 
+};
 el('#deleteLayer').onclick = function(){ if(!lastSelectedId) return deleteFile(lastSelectedId); };
 
 // export all action from card (opens properties then triggers export dialog)
@@ -1047,6 +1141,28 @@ function convertLineToPolygonGeoJSON(gj) {
         type: "FeatureCollection",
         features: newFeatures
     };
+}
+
+// Fungsi untuk restore metadata dari GeoJSON yang di-import
+function restoreMetadataFromGeoJSON(geojson) {
+    if (!geojson || !geojson.features || geojson.features.length === 0) {
+        return null;
+    }
+    
+    // Ambil metadata dari feature pertama
+    const firstFeature = geojson.features[0];
+    const props = firstFeature.properties || {};
+    
+    if (props._style && props._label) {
+        return {
+            name: props._layerName || 'Imported Layer',
+            includeInTotal: props._includeInTotal !== false,
+            style: props._style,
+            label: props._label
+        };
+    }
+    
+    return null;
 }
 
 // ===== TAMBAHKAN DI AKHIR app.js (sebelum // End of app.js) =====
