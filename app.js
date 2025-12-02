@@ -1,4 +1,3 @@
-
 // --- Initialization ---
 var map = L.map('map').setView([0.5,101.4],12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22}).addTo(map);
@@ -1675,8 +1674,8 @@ async function exportPdfFromLayers() {
                         const blockName = meta.labelSettings.blockName || meta.name.replace('.gpx', '');
                         const labelTextColor = hexToRgb(meta.labelSettings.textColor || '#000000');
                         
-                        // ===== UKURAN FONT KECIL DAN SERAGAM =====
-                        const labelSize = 7;
+                        // ===== UKURAN FONT LEBIH KECIL =====
+                        const labelSize = 7;  // 
                         
                         // Hitung ukuran polygon di layar (pixel)
                         const polyBounds = turf.bbox(f);
@@ -1723,11 +1722,11 @@ async function exportPdfFromLayers() {
                             borderWidth: 0.5
                         });
                         
-                        // Teks nama blok (centered)
+                        // Teks nama blok (centered - dengan font lebih kecil)
                         page.drawText(labelText, {
-                            x: centX - (labelText.length * labelSize * 0.25),
-                            y: centY - (labelSize * 0.25),
-                            size: labelSize,
+                            x: centX - (textWidth / 2),
+                            y: centY - (labelSize / 2),
+                            size: labelSize,  // ← Menggunakan labelSize baru (5)
                             color: rgb(labelTextColor.r, labelTextColor.g, labelTextColor.b)
                         });
                     }
